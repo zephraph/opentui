@@ -208,6 +208,8 @@ export class SelectElement extends BufferedElement {
   }
 
   private updateScrollOffset(): void {
+    if (!this.options) return
+    
     const halfVisible = Math.floor(this.maxVisibleItems / 2)
     const newScrollOffset = Math.max(
       0,

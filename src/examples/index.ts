@@ -32,6 +32,7 @@ import * as tabSelectExample from "./tab-select-demo"
 import * as selectExample from "./select-demo"
 import * as inputExample from "./input-demo"
 import * as layoutExample from "./simple-layout-example"
+import * as inputSelectLayoutExample from "./input-select-layout-demo"
 import * as styledTextExample from "./styled-text-demo"
 import { getKeyHandler } from "../ui/lib/KeyHandler"
 
@@ -54,6 +55,12 @@ const examples: Example[] = [
     description: "Flex layout system with multiple configurations",
     run: layoutExample.run,
     destroy: layoutExample.destroy,
+  },
+  {
+    name: "Input & Select Layout Demo",
+    description: "Interactive layout with input and select elements",
+    run: inputSelectLayoutExample.run,
+    destroy: inputSelectLayoutExample.destroy,
   },
   {
     name: "ASCII Font Demo",

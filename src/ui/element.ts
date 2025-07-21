@@ -69,6 +69,7 @@ export abstract class LayoutElement extends Renderable {
   protected parentLayout: ILayout | null = null
   protected _positionType: "absolute" | "relative" = "relative"
   protected _position: Position = {}
+  private _isConstructing: boolean = true
 
   constructor(id: string, options: RenderableOptions & Partial<LayoutOptions>) {
     super(id, options)
@@ -79,8 +80,14 @@ export abstract class LayoutElement extends Renderable {
     this.width = typeof options.width === "number" ? options.width : 0
     this.height = typeof options.height === "number" ? options.height : 0
 
-    this.setWidth(this.width || "auto")
-    this.setHeight(this.height || "auto")
+    const desiredWidth = this.width || "auto"
+    const desiredHeight = this.height || "auto"
+
+    queueMicrotask(() => {
+      this._isConstructing = false
+      this.setWidth(desiredWidth)
+      this.setHeight(desiredHeight)
+    })
   }
 
   private setupYogaProperties(options: RenderableOptions & Partial<LayoutOptions>): void {
@@ -241,6 +248,7 @@ export abstract class LayoutElement extends Renderable {
     const newWidth = Math.max(layout.width, 1)
     const newHeight = Math.max(layout.height, 1)
     const sizeChanged = this.width !== newWidth || this.height !== newHeight
+    
     this.width = newWidth
     this.height = newHeight
 
@@ -513,9 +521,19 @@ export abstract class BufferedElement extends Element {
   }
 
   protected createFrameBuffer(): void {
-    this.frameBuffer = OptimizedBuffer.create(this.width, this.height, {
-      respectAlpha: this.backgroundColor.a < 1.0,
-    })
+    if (this.width <= 0 || this.height <= 0) {
+      this.frameBuffer = null
+      return
+    }
+    
+    try {
+      this.frameBuffer = OptimizedBuffer.create(this.width, this.height, {
+        respectAlpha: this.backgroundColor.a < 1.0,
+      })
+    } catch (error) {
+      console.error(`Failed to create frame buffer for ${this.id}:`, error)
+      this.frameBuffer = null
+    }
   }
 
   protected refreshFrameBuffer(): void {
@@ -559,7 +577,18 @@ export abstract class BufferedElement extends Element {
   ): void
 
   protected onResize(width: number, height: number): void {
-    this.frameBuffer?.resize(width, height)
+    if (width <= 0 || height <= 0) {
+      super.onResize(width, height)
+      return
+    }
+
+    if (this.frameBuffer) {
+      this.frameBuffer.resize(width, height)
+    } else {
+      this.width = width
+      this.height = height
+      this.createFrameBuffer()
+    }
 
     super.onResize(width, height)
   }
