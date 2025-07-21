@@ -10,6 +10,12 @@ bun build:prod
 
 This creates platform-specific libraries in `src/zig/lib/` that are automatically loaded by the TypeScript layer.
 
+## Examples
+
+```bash
+bun run src/examples/index.ts
+```
+
 ## CLI Renderer
 
 ### Renderables
