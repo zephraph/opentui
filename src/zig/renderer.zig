@@ -43,6 +43,16 @@ pub const DebugOverlayCorner = enum {
     bottomRight,
 };
 
+var globalCursor = struct {
+    x: u32 = DEFAULT_CURSOR_X,
+    y: u32 = DEFAULT_CURSOR_Y,
+    visible: bool = true,
+    style: CursorStyle = .block,
+    blinking: bool = false,
+    color: RGBA = .{ 1.0, 1.0, 1.0, 1.0 },
+    mutex: std.Thread.Mutex = .{},
+}{};
+
 pub const CliRenderer = struct {
     width: u32,
     height: u32,
@@ -50,23 +60,6 @@ pub const CliRenderer = struct {
     nextRenderBuffer: *OptimizedBuffer,
     backgroundColor: RGBA,
 
-    cursorPosition: struct {
-        x: u32,
-        y: u32,
-        visible: bool,
-        style: CursorStyle,
-        blinking: bool,
-        color: RGBA,
-
-        const DEFAULT = @This(){
-            .x = DEFAULT_CURSOR_X,
-            .y = DEFAULT_CURSOR_Y,
-            .visible = true,
-            .style = .block,
-            .blinking = false,
-            .color = .{ 1.0, 1.0, 1.0, 1.0 },
-        };
-    },
     renderStats: struct {
         lastFrameTime: f64,
         averageFrameTime: f64,
@@ -173,14 +166,6 @@ pub const CliRenderer = struct {
             .nextRenderBuffer = nextBuffer,
             .backgroundColor = .{ 0.0, 0.0, 0.0, 1.0 },
 
-            .cursorPosition = .{
-                .x = DEFAULT_CURSOR_X,
-                .y = DEFAULT_CURSOR_Y,
-                .visible = true,
-                .style = .block,
-                .blinking = false,
-                .color = .{ 1.0, 1.0, 1.0, 1.0 },
-            },
             .renderStats = .{
                 .lastFrameTime = 0,
                 .averageFrameTime = 0,
@@ -305,23 +290,6 @@ pub const CliRenderer = struct {
         self.renderStats.arrayBuffers = arrayBuffers;
     }
 
-    pub fn setCursorPosition(self: *CliRenderer, x: i32, y: i32, visible: bool) void {
-        self.cursorPosition.x = @intCast(@max(1, @min(@as(i32, @intCast(self.width)), x)));
-        self.cursorPosition.y = @intCast(@max(1, @min(@as(i32, @intCast(self.height)), y)));
-        self.cursorPosition.visible = visible;
-    }
-
-    pub fn setCursorStyle(self: *CliRenderer, styleStr: []const u8, blinking: bool) void {
-        if (styleStr.len == 0) return;
-
-        self.cursorPosition.style = std.meta.stringToEnum(CursorStyle, styleStr) orelse .block;
-        self.cursorPosition.blinking = blinking;
-    }
-
-    pub fn setCursorColor(self: *CliRenderer, color: RGBA) void {
-        self.cursorPosition.color = color;
-    }
-
     pub fn resize(self: *CliRenderer, width: u32, height: u32) !void {
         if (self.width == width and self.height == height) return;
 
@@ -334,8 +302,10 @@ pub const CliRenderer = struct {
         try self.currentRenderBuffer.clear(.{ 0.0, 0.0, 0.0, 1.0 }, CLEAR_CHAR);
         try self.nextRenderBuffer.clear(.{ self.backgroundColor[0], self.backgroundColor[1], self.backgroundColor[2], 1.0 }, null);
 
-        self.cursorPosition.x = @min(self.cursorPosition.x, width);
-        self.cursorPosition.y = @min(self.cursorPosition.y, height);
+        globalCursor.mutex.lock();
+        globalCursor.x = @min(globalCursor.x, width);
+        globalCursor.y = @min(globalCursor.y, height);
+        globalCursor.mutex.unlock();
     }
 
     pub fn setBackgroundColor(self: *CliRenderer, rgba: RGBA) void {
@@ -558,41 +528,43 @@ pub const CliRenderer = struct {
 
         writer.writeAll(ansi.ANSI.reset) catch {};
 
-        if (self.cursorPosition.visible) {
+        globalCursor.mutex.lock();
+        if (globalCursor.visible) {
             var cursorStyleCode: []const u8 = undefined;
 
-            switch (self.cursorPosition.style) {
+            switch (globalCursor.style) {
                 .block => {
-                    cursorStyleCode = if (self.cursorPosition.blinking)
+                    cursorStyleCode = if (globalCursor.blinking)
                         ansi.ANSI.cursorBlockBlink
                     else
                         ansi.ANSI.cursorBlock;
                 },
                 .line => {
-                    cursorStyleCode = if (self.cursorPosition.blinking)
+                    cursorStyleCode = if (globalCursor.blinking)
                         ansi.ANSI.cursorLineBlink
                     else
                         ansi.ANSI.cursorLine;
                 },
                 .underline => {
-                    cursorStyleCode = if (self.cursorPosition.blinking)
+                    cursorStyleCode = if (globalCursor.blinking)
                         ansi.ANSI.cursorUnderlineBlink
                     else
                         ansi.ANSI.cursorUnderline;
                 },
             }
 
-            const cursorR = rgbaComponentToU8(self.cursorPosition.color[0]);
-            const cursorG = rgbaComponentToU8(self.cursorPosition.color[1]);
-            const cursorB = rgbaComponentToU8(self.cursorPosition.color[2]);
+            const cursorR = rgbaComponentToU8(globalCursor.color[0]);
+            const cursorG = rgbaComponentToU8(globalCursor.color[1]);
+            const cursorB = rgbaComponentToU8(globalCursor.color[2]);
 
             ansi.ANSI.cursorColorOutputWriter(writer, cursorR, cursorG, cursorB) catch {};
             writer.writeAll(cursorStyleCode) catch {};
-            ansi.ANSI.moveToOutput(writer, self.cursorPosition.x, self.cursorPosition.y) catch {};
+            ansi.ANSI.moveToOutput(writer, globalCursor.x, globalCursor.y) catch {};
             writer.writeAll(ansi.ANSI.showCursor) catch {};
         } else {
             writer.writeAll(ansi.ANSI.hideCursor) catch {};
         }
+        globalCursor.mutex.unlock();
 
         const renderEndTime = std.time.microTimestamp();
         const renderTime = @as(f64, @floatFromInt(renderEndTime - renderStartTime));
@@ -731,3 +703,26 @@ pub const CliRenderer = struct {
         row += 1;
     }
 };
+
+pub fn setCursorPositionGlobal(x: i32, y: i32, visible: bool) void {
+    globalCursor.mutex.lock();
+    globalCursor.x = @intCast(@max(1, x));
+    globalCursor.y = @intCast(@max(1, y));
+    globalCursor.visible = visible;
+    globalCursor.mutex.unlock();
+}
+
+pub fn setCursorStyleGlobal(styleStr: []const u8, blinking: bool) void {
+    if (styleStr.len == 0) return;
+
+    globalCursor.mutex.lock();
+    globalCursor.style = std.meta.stringToEnum(CursorStyle, styleStr) orelse .block;
+    globalCursor.blinking = blinking;
+    globalCursor.mutex.unlock();
+}
+
+pub fn setCursorColorGlobal(color: RGBA) void {
+    globalCursor.mutex.lock();
+    globalCursor.color = color;
+    globalCursor.mutex.unlock();
+}

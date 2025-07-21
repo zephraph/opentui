@@ -161,17 +161,17 @@ function getRenderooLib(libPath?: string) {
       returns: "void",
     },
 
-    // Cursor and rendering control
+    // Global cursor functions
     setCursorPosition: {
-      args: ["ptr", "i32", "i32", "bool"],
+      args: ["i32", "i32", "bool"],
       returns: "void",
     },
     setCursorStyle: {
-      args: ["ptr", "ptr", "u32", "bool"],
+      args: ["ptr", "u32", "bool"],
       returns: "void",
     },
     setCursorColor: {
-      args: ["ptr", "ptr"],
+      args: ["ptr"],
       returns: "void",
     },
 
@@ -283,10 +283,9 @@ export interface RenderLib {
     attributes: Uint8Array
   }
   resizeRenderer: (renderer: Pointer, width: number, height: number) => void
-  setCursorPosition: (renderer: Pointer, x: number, y: number, visible: boolean) => void
-  setCursorStyle: (renderer: Pointer, style: CursorStyle, blinking: boolean) => void
-  setCursorColor: (renderer: Pointer, color: RGBA) => void
-  setCursorColorF?: (renderer: Pointer, r: number, g: number, b: number) => void
+  setCursorPosition: (x: number, y: number, visible: boolean) => void
+  setCursorStyle: (style: CursorStyle, blinking: boolean) => void
+  setCursorColor: (color: RGBA) => void
   setDebugOverlay: (renderer: Pointer, enabled: boolean, corner: DebugOverlayCorner) => void
   clearTerminal: (renderer: Pointer) => void
 }
@@ -535,17 +534,17 @@ class FFIRenderLib implements RenderLib {
     this.renderoo.symbols.resizeRenderer(renderer, width, height)
   }
 
-  public setCursorPosition(renderer: Pointer, x: number, y: number, visible: boolean) {
-    this.renderoo.symbols.setCursorPosition(renderer, x, y, visible)
+  public setCursorPosition(x: number, y: number, visible: boolean) {
+    this.renderoo.symbols.setCursorPosition(x, y, visible)
   }
 
-  public setCursorStyle(renderer: Pointer, style: CursorStyle, blinking: boolean) {
+  public setCursorStyle(style: CursorStyle, blinking: boolean) {
     const stylePtr = this.encoder.encode(style)
-    this.renderoo.symbols.setCursorStyle(renderer, stylePtr, style.length, blinking)
+    this.renderoo.symbols.setCursorStyle(stylePtr, style.length, blinking)
   }
 
-  public setCursorColor(renderer: Pointer, color: RGBA) {
-    this.renderoo.symbols.setCursorColor(renderer, color.buffer)
+  public setCursorColor(color: RGBA) {
+    this.renderoo.symbols.setCursorColor(color.buffer)
   }
 
   public render(renderer: Pointer) {

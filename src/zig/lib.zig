@@ -105,17 +105,17 @@ export fn drawFrameBuffer(targetPtr: *buffer.OptimizedBuffer, destX: i32, destY:
     targetPtr.drawFrameBuffer(destX, destY, frameBuffer, srcX, srcY, srcWidth, srcHeight);
 }
 
-export fn setCursorPosition(rendererPtr: *renderer.CliRenderer, x: i32, y: i32, visible: bool) void {
-    rendererPtr.setCursorPosition(x, y, visible);
+export fn setCursorPosition(x: i32, y: i32, visible: bool) void {
+    renderer.setCursorPositionGlobal(x, y, visible);
 }
 
-export fn setCursorStyle(rendererPtr: *renderer.CliRenderer, stylePtr: [*]const u8, styleLen: usize, blinking: bool) void {
+export fn setCursorStyle(stylePtr: [*]const u8, styleLen: usize, blinking: bool) void {
     const style = stylePtr[0..styleLen];
-    rendererPtr.setCursorStyle(style, blinking);
+    renderer.setCursorStyleGlobal(style, blinking);
 }
 
-export fn setCursorColor(rendererPtr: *renderer.CliRenderer, color: [*]const f32) void {
-    rendererPtr.setCursorColor(f32PtrToRGBA(color));
+export fn setCursorColor(color: [*]const f32) void {
+    renderer.setCursorColorGlobal(f32PtrToRGBA(color));
 }
 
 export fn setDebugOverlay(rendererPtr: *renderer.CliRenderer, enabled: bool, corner: u8) void {

@@ -453,15 +453,35 @@ export class CliRenderer extends Renderable {
     return stObj
   }
 
+  public static setCursorPosition(x: number, y: number, visible: boolean = true): void {
+    const lib = resolveRenderLib()
+    lib.setCursorPosition(x, y, visible)
+  }
+
+  public static setCursorStyle(style: CursorStyle, blinking: boolean = false, color?: RGBA): void {
+    const lib = resolveRenderLib()
+    lib.setCursorStyle(style, blinking)
+    if (color) {
+      lib.setCursorColor(color)
+    }
+  }
+
+  public static setCursorColor(color: RGBA): void {
+    const lib = resolveRenderLib()
+    lib.setCursorColor(color)
+  }
+
+  // Instance cursor methods (delegate to static methods)
   public setCursorPosition(x: number, y: number, visible: boolean = true): void {
-    this.lib.setCursorPosition(this.rendererPtr, x, y, visible)
+    CliRenderer.setCursorPosition(x, y, visible)
   }
 
   public setCursorStyle(style: CursorStyle, blinking: boolean = false, color?: RGBA): void {
-    this.lib.setCursorStyle(this.rendererPtr, style, blinking)
-    if (color) {
-      this.lib.setCursorColor(this.rendererPtr, color)
-    }
+    CliRenderer.setCursorStyle(style, blinking, color)
+  }
+
+  public setCursorColor(color: RGBA): void {
+    CliRenderer.setCursorColor(color)
   }
 
   public addPostProcessFn(processFn: (buffer: OptimizedBuffer, deltaTime: number) => void): void {
@@ -581,6 +601,7 @@ export class CliRenderer extends Renderable {
     const end = performance.now()
     this.renderStats.frameCallbackTime = end - start
 
+    // Render the renderable tree
     this.render(this.nextRenderBuffer)
 
     for (const postProcessFn of this.postProcessFns) {
