@@ -30,6 +30,7 @@ import * as textureLoadingExample from "./texture-loading-demo"
 import * as timelineExample from "./timeline-example"
 import * as tabSelectExample from "./tab-select-demo"
 import * as selectExample from "./select-demo"
+import * as inputExample from "./input-demo"
 import * as layoutExample from "./simple-layout-example"
 import * as styledTextExample from "./styled-text-demo"
 import { getKeyHandler } from "../ui/lib/KeyHandler"
@@ -161,6 +162,12 @@ const examples: Example[] = [
     description: "Interactive SelectElement demo with customizable options",
     run: selectExample.run,
     destroy: selectExample.destroy,
+  },
+  {
+    name: "Input Demo",
+    description: "Interactive InputElement demo with validation and multiple fields",
+    run: inputExample.run,
+    destroy: inputExample.destroy,
   },
 ]
 
