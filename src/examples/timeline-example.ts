@@ -270,6 +270,7 @@ class TimelineExample {
         height: 1,
         bg: "#FFE66D",
         zIndex: 2,
+        border: false,
       })
       this.parentContainer.add(newMainProgressBox)
     }
@@ -285,6 +286,7 @@ class TimelineExample {
         height: 1,
         bg: "#FF6B6B",
         zIndex: 2,
+        border: false,
       })
       this.parentContainer.add(newSub1ProgressBox)
     }
@@ -300,6 +302,7 @@ class TimelineExample {
         height: 1,
         bg: "#4ECDC4",
         zIndex: 2,
+        border: false,
       })
       this.parentContainer.add(newSub2ProgressBox)
     }
@@ -347,13 +350,13 @@ class TimelineExample {
         x: 100,
         y: 50,
         duration: 2000,
-        ease: "outBounce",
+        ease: "inOutQuad",
         onUpdate: (values: JSAnimation) => {
           const x = values.targets[0].x
           const y = values.targets[0].y
 
-          this.boxObject.x = Math.max(1, Math.min(70, 10 + Math.floor(x / 10)))
-          this.boxObject.y = Math.max(1, Math.min(30, 8 + Math.floor(y / 20)))
+          this.boxObject.x = Math.max(1, Math.min(70, 10 + Math.round(x / 3)))
+          this.boxObject.y = Math.max(1, Math.min(30, 8 + Math.round(y / 5)))
 
           this.statusLine2.content = `Box Position: x=${x.toFixed(1)}, y=${y.toFixed(1)}`
         },
@@ -371,9 +374,9 @@ class TimelineExample {
         onUpdate: (values: JSAnimation) => {
           const scale = values.targets[0].scale
           const rotation = values.targets[0].rotation
-          const size = Math.max(4, Math.floor(4 * scale))
+          const size = Math.max(4, Math.round(4 * scale))
           this.boxObject.width = size
-          this.boxObject.height = Math.max(2, Math.floor(size / 2))
+          this.boxObject.height = Math.max(2, Math.round(size / 2))
 
           this.statusLine3.content = `Box Scale/Rot: scale=${scale.toFixed(2)}, rot=${rotation.toFixed(2)}`
         },
@@ -389,19 +392,19 @@ class TimelineExample {
         scale: 0.5,
         rotation: 0,
         duration: 3000,
-        ease: "outElastic",
+        ease: "inOutSine",
         onUpdate: (values: JSAnimation) => {
           const x = values.targets[0].x
           const y = values.targets[0].y
           const scale = values.targets[0].scale
           const rotation = values.targets[0].rotation
 
-          this.boxObject.x = Math.max(1, Math.min(70, 10 + Math.floor(x / 10)))
-          this.boxObject.y = Math.max(1, Math.min(30, 8 + Math.floor(y / 20)))
+          this.boxObject.x = Math.max(1, Math.min(70, 10 + Math.round(x / 3)))
+          this.boxObject.y = Math.max(1, Math.min(30, 8 + Math.round(y / 5)))
 
-          const size = Math.max(2, Math.floor(4 * scale))
+          const size = Math.max(2, Math.round(4 * scale))
           this.boxObject.width = size
-          this.boxObject.height = Math.max(1, Math.floor(size / 2))
+          this.boxObject.height = Math.max(1, Math.round(size / 2))
 
           this.statusLine2.content = `Box Position (Reset): x=${x.toFixed(1)}, y=${y.toFixed(1)}`
           this.statusLine3.content = `Box Scale/Rot (Reset): scale=${scale.toFixed(2)}, rot=${rotation.toFixed(2)}`
@@ -505,7 +508,7 @@ class TimelineExample {
         loopDelay: 200,
         onUpdate: (values: JSAnimation) => {
           const x = values.targets[0].x
-          this.alternatingObject.x = Math.floor(x)
+          this.alternatingObject.x = Math.round(x)
           this.alternatingObject.y = 1
           this.statusLine9.content = `Alternating: x=${x.toFixed(1)} (left/right loop=5)`
         },
@@ -525,7 +528,7 @@ class TimelineExample {
           const velocity = values.targets[0].velocity
           const acceleration = values.targets[0].acceleration
           const mass = values.targets[0].mass
-          const velocityHeight = Math.max(1, Math.floor(velocity / 10))
+          const velocityHeight = Math.max(1, Math.round(velocity / 6))
           const physicsObject = this.parentContainer.getRenderable("physics-object") as BoxRenderable
           if (physicsObject) {
             physicsObject.height = Math.min(6, velocityHeight)
@@ -544,13 +547,13 @@ class TimelineExample {
         acceleration: -5,
         mass: 0.8,
         duration: 3000,
-        ease: "outBounce",
+        ease: "inOutSine",
         onUpdate: (values: JSAnimation) => {
           const velocity = values.targets[0].velocity
           const acceleration = values.targets[0].acceleration
           const mass = values.targets[0].mass
 
-          const velocityHeight = Math.max(1, Math.abs(Math.floor(velocity / 5)))
+          const velocityHeight = Math.max(1, Math.abs(Math.round(velocity / 4)))
           const physicsObject = this.parentContainer.getRenderable("physics-object") as BoxRenderable
           if (physicsObject) {
             physicsObject.height = Math.min(6, velocityHeight)
