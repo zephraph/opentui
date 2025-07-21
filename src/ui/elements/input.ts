@@ -2,6 +2,7 @@ import { BufferedElement, type ElementOptions } from "../element"
 import { parseColor } from "../../utils"
 import type { RGBA, ColorInput } from "../../types"
 import type { ParsedKey } from "../../parse.keypress"
+import { CliRenderer } from "../.."
 
 export interface InputElementOptions extends ElementOptions {
   placeholder?: string
@@ -27,8 +28,6 @@ export class InputElement extends BufferedElement {
   private cursorColor: RGBA
   private maxLength: number
   private lastCommittedValue: string = ""
-  private cursorVisible: boolean = true
-  private cursorBlinkTimer: Timer | null = null
 
   constructor(id: string, options: InputElementOptions) {
     super(id, options)
@@ -41,37 +40,44 @@ export class InputElement extends BufferedElement {
 
     this.placeholderColor = parseColor(options.placeholderColor || "#666666")
     this.cursorColor = parseColor(options.cursorColor || "#FFFFFF")
-    
-    this.startCursorBlink()
   }
 
-  private startCursorBlink(): void {
-    if (this.cursorBlinkTimer) {
-      clearInterval(this.cursorBlinkTimer)
+  private updateCursorPosition(): void {
+    if (!this.focused) return
+
+    const hasBorder = this.border !== false
+    const contentX = hasBorder ? 1 : 0
+    const contentY = hasBorder ? 1 : 0
+    const contentWidth = hasBorder ? this.width - 2 : this.width
+
+    const maxVisibleChars = contentWidth - 1
+    let displayStartIndex = 0
+    
+    if (this.cursorPosition >= maxVisibleChars) {
+      displayStartIndex = this.cursorPosition - maxVisibleChars + 1
     }
 
-    this.cursorBlinkTimer = setInterval(() => {
-      if (this.focused) {
-        this.cursorVisible = !this.cursorVisible
-        this.needsRefresh = true
-      }
-    }, 500)
+    const cursorDisplayX = this.cursorPosition - displayStartIndex
+
+    if (cursorDisplayX >= 0 && cursorDisplayX < contentWidth) {
+      const absoluteCursorX = this.x + contentX + cursorDisplayX + 1
+      const absoluteCursorY = this.y + contentY + 1
+      
+      CliRenderer.setCursorPosition(absoluteCursorX, absoluteCursorY, true)
+      CliRenderer.setCursorColor(this.cursorColor)
+    }
   }
 
   public focus(): void {
     super.focus()
-    this.cursorVisible = true
-    this.startCursorBlink()
+    CliRenderer.setCursorStyle("block", true, this.cursorColor)
+    this.updateCursorPosition()
     this.needsRefresh = true
   }
 
   public blur(): void {
     super.blur()
-    this.cursorVisible = false
-    if (this.cursorBlinkTimer) {
-      clearInterval(this.cursorBlinkTimer)
-      this.cursorBlinkTimer = null
-    }
+    CliRenderer.setCursorPosition(0, 0, false) // Hide cursor
     
     if (this.value !== this.lastCommittedValue) {
       this.lastCommittedValue = this.value
@@ -96,21 +102,13 @@ export class InputElement extends BufferedElement {
     }
 
     const visibleText = displayText.substring(displayStartIndex, displayStartIndex + maxVisibleChars)
-    const cursorDisplayX = this.cursorPosition - displayStartIndex
 
     if (visibleText) {
       this.frameBuffer.drawText(visibleText, contentX, contentY, textColor)
     }
 
-    if (this.focused && this.cursorVisible && cursorDisplayX >= 0 && cursorDisplayX < contentWidth) {
-      const cursorX = contentX + cursorDisplayX
-      
-      if (this.cursorPosition >= this.value.length || this.value.length === 0) {
-        this.frameBuffer.drawText("█", cursorX, contentY, this.cursorColor)
-      } else {
-        const charAtCursor = this.value[this.cursorPosition] || " "
-        this.frameBuffer.drawText(charAtCursor, cursorX, contentY, this.backgroundColor, this.cursorColor)
-      }
+    if (this.focused) {
+      this.updateCursorPosition()
     }
   }
 
@@ -120,6 +118,7 @@ export class InputElement extends BufferedElement {
       this.value = newValue
       this.cursorPosition = Math.min(this.cursorPosition, this.value.length)
       this.needsRefresh = true
+      this.updateCursorPosition()
       this.emit(InputElementEvents.INPUT, this.value)
     }
   }
@@ -147,8 +146,8 @@ export class InputElement extends BufferedElement {
     const newPosition = Math.max(0, Math.min(position, this.value.length))
     if (this.cursorPosition !== newPosition) {
       this.cursorPosition = newPosition
-      this.cursorVisible = true
       this.needsRefresh = true
+      this.updateCursorPosition()
     }
   }
 
@@ -162,6 +161,7 @@ export class InputElement extends BufferedElement {
     this.value = beforeCursor + text + afterCursor
     this.cursorPosition += text.length
     this.needsRefresh = true
+    this.updateCursorPosition()
     this.emit(InputElementEvents.INPUT, this.value)
   }
 
@@ -172,12 +172,14 @@ export class InputElement extends BufferedElement {
       this.value = beforeCursor + afterCursor
       this.cursorPosition--
       this.needsRefresh = true
+      this.updateCursorPosition()
       this.emit(InputElementEvents.INPUT, this.value)
     } else if (direction === "forward" && this.cursorPosition < this.value.length) {
       const beforeCursor = this.value.substring(0, this.cursorPosition)
       const afterCursor = this.value.substring(this.cursorPosition + 1)
       this.value = beforeCursor + afterCursor
       this.needsRefresh = true
+      this.updateCursorPosition()
       this.emit(InputElementEvents.INPUT, this.value)
     }
   }
@@ -243,9 +245,8 @@ export class InputElement extends BufferedElement {
   }
 
   protected destroySelf(): void {
-    if (this.cursorBlinkTimer) {
-      clearInterval(this.cursorBlinkTimer)
-      this.cursorBlinkTimer = null
+    if (this.focused) {
+      CliRenderer.setCursorPosition(0, 0, false)
     }
     super.destroySelf()
   }
