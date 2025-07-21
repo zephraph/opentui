@@ -1,27 +1,31 @@
 # Renderoo
 
-A Bun module with Zig integration for terminal rendering.
+A Bun exclusively module for terminal rendering.
 
-## Features
+## Build
 
-- Fast buffer-based terminal rendering
-- Support for Unicode text, colors, and styles
-- Alpha blending for transparent UI elements
-- Optimized rendering of only modified cells
-- Text, Box, and FrameBuffer rendering components
-- Custom border styles
+```bash
+bun build:prod
+```
 
-## Usage
+This creates platform-specific libraries in `src/zig/lib/` that are automatically loaded by the TypeScript layer.
+
+## CLI Renderer
+
+### Renderables
+
+Renderables are hierarchical objects that can be positioned and rendered to buffers:
 
 ```typescript
-import { Renderer } from "renderoo";
+import { Renderable } from "renderoo"
 
-// Create a renderer with terminal dimensions
-const renderer = new Renderer(
-  process.stdout.columns || 80,
-  process.stdout.rows || 24
-);
+class MyRenderable extends Renderable {
+  protected renderSelf(buffer: OptimizedBuffer): void {
+    buffer.drawText("Custom content", this.x, this.y, RGBA.fromValues(1, 1, 1, 1))
+  }
+}
 
-// Set background color
-renderer.setBackground(0, 0, 40); // Dark blue
+const obj = new MyRenderable("my-obj", { x: 10, y: 5, zIndex: 1 })
+
+renderer.add(obj)
 ```
