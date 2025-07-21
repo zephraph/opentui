@@ -22,7 +22,7 @@ export function hexToRgb(hex: string): RGBA {
 export function rgbToHex(rgb: RGBA): string {
   return (
     "#" +
-    rgb
+    [rgb.r, rgb.g, rgb.b]
       .map((x) => {
         const hex = Math.floor(Math.max(0, Math.min(1, x) * 255)).toString(16)
         return hex.length === 1 ? "0" + hex : hex

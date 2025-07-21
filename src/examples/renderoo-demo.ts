@@ -872,7 +872,7 @@ export function run(renderer: CliRenderer): void {
       // Update interactive border state
       const interactiveBorder = tabGroup.getRenderable("interactive-border") as BoxRenderable
       if (interactiveBorder) {
-        interactiveBorder.borderSides = interactiveBorderSides
+        interactiveBorder.border = getBorderFromSides(interactiveBorderSides)
       }
 
       let borderDesc = ""
