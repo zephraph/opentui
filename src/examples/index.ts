@@ -34,6 +34,7 @@ import * as inputExample from "./input-demo"
 import * as layoutExample from "./simple-layout-example"
 import * as inputSelectLayoutExample from "./input-select-layout-demo"
 import * as styledTextExample from "./styled-text-demo"
+import * as mouseInteractionExample from "./mouse-interaction-demo"
 import { getKeyHandler } from "../ui/lib/KeyHandler"
 
 interface Example {
@@ -44,6 +45,12 @@ interface Example {
 }
 
 const examples: Example[] = [
+  {
+    name: "Mouse Interaction Demo",
+    description: "Interactive mouse trails and clickable cells demonstration",
+    run: mouseInteractionExample.run,
+    destroy: mouseInteractionExample.destroy,
+  },
   {
     name: "Styled Text Demo",
     description: "Template literals with styled text, colors, and formatting",

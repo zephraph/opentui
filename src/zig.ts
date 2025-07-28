@@ -86,7 +86,7 @@ function getRenderooLib(libPath?: string) {
     },
 
     createOptimizedBuffer: {
-      args: ["u32", "u32", "u8", "bool"],
+      args: ["u32", "u32", "bool"],
       returns: "ptr",
     },
     destroyOptimizedBuffer: {
@@ -103,10 +103,6 @@ function getRenderooLib(libPath?: string) {
       returns: "u32",
     },
     getBufferHeight: {
-      args: ["ptr"],
-      returns: "u32",
-    },
-    getBufferTabStopWidth: {
       args: ["ptr"],
       returns: "u32",
     },
@@ -195,6 +191,19 @@ function getRenderooLib(libPath?: string) {
       args: ["ptr", "ptr", "usize", "u32", "u32", "u32", "u32"],
       returns: "void",
     },
+
+    addToHitGrid: {
+      args: ["ptr", "i32", "i32", "u32", "u32", "u32"],
+      returns: "void",
+    },
+    checkHit: {
+      args: ["ptr", "u32", "u32"],
+      returns: "u32",
+    },
+    clearHitGrid: {
+      args: ["ptr"],
+      returns: "void",
+    },
   })
 }
 
@@ -211,7 +220,6 @@ export interface RenderLib {
   createOptimizedBuffer: (
     width: number,
     height: number,
-    tabStopWidth: number,
     respectAlpha?: boolean,
   ) => OptimizedBuffer
   destroyOptimizedBuffer: (bufferPtr: Pointer) => void
@@ -227,7 +235,6 @@ export interface RenderLib {
   ) => void
   getBufferWidth: (buffer: Pointer) => number
   getBufferHeight: (buffer: Pointer) => number
-  getBufferTabStopWidth: (buffer: Pointer) => number
   bufferClear: (buffer: Pointer, color: RGBA) => void
   bufferGetCharPtr: (buffer: Pointer) => Pointer
   bufferGetFgPtr: (buffer: Pointer) => Pointer
@@ -288,6 +295,9 @@ export interface RenderLib {
   setCursorColor: (color: RGBA) => void
   setDebugOverlay: (renderer: Pointer, enabled: boolean, corner: DebugOverlayCorner) => void
   clearTerminal: (renderer: Pointer) => void
+  addToHitGrid: (renderer: Pointer, x: number, y: number, width: number, height: number, id: number) => void
+  checkHit: (renderer: Pointer, x: number, y: number) => number
+  clearHitGrid: (renderer: Pointer) => void
 }
 
 class FFIRenderLib implements RenderLib {
@@ -331,10 +341,9 @@ class FFIRenderLib implements RenderLib {
     const width = this.renderoo.symbols.getBufferWidth(bufferPtr)
     const height = this.renderoo.symbols.getBufferHeight(bufferPtr)
     const size = width * height
-    const tabStopWidth = this.renderoo.symbols.getBufferTabStopWidth(bufferPtr)
     const buffers = this.getBuffer(bufferPtr, size)
 
-    return new OptimizedBuffer(this, bufferPtr, buffers, width, height, { tabStopWidth })
+    return new OptimizedBuffer(this, bufferPtr, buffers, width, height, {})
   }
 
   public getCurrentBuffer(renderer: Pointer): OptimizedBuffer {
@@ -346,10 +355,9 @@ class FFIRenderLib implements RenderLib {
     const width = this.renderoo.symbols.getBufferWidth(bufferPtr)
     const height = this.renderoo.symbols.getBufferHeight(bufferPtr)
     const size = width * height
-    const tabStopWidth = this.renderoo.symbols.getBufferTabStopWidth(bufferPtr)
     const buffers = this.getBuffer(bufferPtr, size)
 
-    return new OptimizedBuffer(this, bufferPtr, buffers, width, height, { tabStopWidth })
+    return new OptimizedBuffer(this, bufferPtr, buffers, width, height, {})
   }
 
   private getBuffer(
@@ -426,10 +434,6 @@ class FFIRenderLib implements RenderLib {
 
   public getBufferHeight(buffer: Pointer): number {
     return this.renderoo.symbols.getBufferHeight(buffer)
-  }
-
-  public getBufferTabStopWidth(buffer: Pointer): number {
-    return this.renderoo.symbols.getBufferTabStopWidth(buffer)
   }
 
   public bufferClear(buffer: Pointer, color: RGBA) {
@@ -554,17 +558,16 @@ class FFIRenderLib implements RenderLib {
   public createOptimizedBuffer(
     width: number,
     height: number,
-    tabStopWidth: number,
     respectAlpha: boolean = false,
   ): OptimizedBuffer {
-    const bufferPtr = this.renderoo.symbols.createOptimizedBuffer(width, height, tabStopWidth, respectAlpha)
+    const bufferPtr = this.renderoo.symbols.createOptimizedBuffer(width, height, respectAlpha)
     if (!bufferPtr) {
       throw new Error("Failed to create optimized buffer")
     }
     const size = width * height
     const buffers = this.getBuffer(bufferPtr, size)
 
-    return new OptimizedBuffer(this, bufferPtr, buffers, width, height, { tabStopWidth, respectAlpha })
+    return new OptimizedBuffer(this, bufferPtr, buffers, width, height, { respectAlpha })
   }
 
   public destroyOptimizedBuffer(bufferPtr: Pointer) {
@@ -594,6 +597,18 @@ class FFIRenderLib implements RenderLib {
 
   public clearTerminal(renderer: Pointer) {
     this.renderoo.symbols.clearTerminal(renderer)
+  }
+
+  public addToHitGrid(renderer: Pointer, x: number, y: number, width: number, height: number, id: number) {
+    this.renderoo.symbols.addToHitGrid(renderer, x, y, width, height, id)
+  }
+
+  public checkHit(renderer: Pointer, x: number, y: number): number {
+    return this.renderoo.symbols.checkHit(renderer, x, y)
+  }
+
+  public clearHitGrid(renderer: Pointer) {
+    this.renderoo.symbols.clearHitGrid(renderer)
   }
 }
 

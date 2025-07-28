@@ -49,7 +49,6 @@ export class OptimizedBuffer {
   }
   private width: number
   private height: number
-  public tabStopWidth: number = 2
   public respectAlpha: boolean = false
   private useFFI: boolean = true
 
@@ -68,11 +67,10 @@ export class OptimizedBuffer {
     },
     width: number,
     height: number,
-    options: { tabStopWidth?: number; respectAlpha?: boolean },
+    options: { respectAlpha?: boolean },
   ) {
     this.id = `fb_${fbIdCounter++}`
     this.lib = lib
-    this.tabStopWidth = options.tabStopWidth || 2
     this.respectAlpha = options.respectAlpha || false
     this.width = width
     this.height = height
@@ -83,12 +81,11 @@ export class OptimizedBuffer {
   static create(
     width: number,
     height: number,
-    options: { tabStopWidth?: number; respectAlpha?: boolean } = {},
+    options: { respectAlpha?: boolean } = {},
   ): OptimizedBuffer {
     const lib = resolveRenderLib()
-    const tabStopWidth = options.tabStopWidth || 2
     const respectAlpha = options.respectAlpha || false
-    return lib.createOptimizedBuffer(width, height, tabStopWidth, respectAlpha)
+    return lib.createOptimizedBuffer(width, height, respectAlpha)
   }
 
   public get buffers(): {
@@ -253,10 +250,8 @@ export class OptimizedBuffer {
     let startX = this.width
     let endX = 0
 
-    const sanitizedText = text.replace(/\t/g, " ".repeat(this.tabStopWidth))
-
     let i = 0
-    for (const char of sanitizedText) {
+    for (const char of text) {
       const charX = x + i
       i++
 

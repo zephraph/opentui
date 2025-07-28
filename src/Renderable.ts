@@ -1,17 +1,26 @@
-import type { OptimizedBuffer } from "."
+import { OptimizedBuffer, type RenderContext, type MouseEvent } from "."
 import { EventEmitter } from "events"
 
 export interface RenderableOptions {
   x: number
   y: number
+  width: number
+  height: number
   zIndex: number
   visible?: boolean
 }
 
+let renderableNumber = 1
+
 export abstract class Renderable extends EventEmitter {
+  static renderablesByNumber: Map<number, Renderable> = new Map()
   public id: string
+  public num: number
+  protected ctx: RenderContext | null = null
   private _x: number
   private _y: number
+  private _width: number
+  private _height: number
   private _zIndex: number
   public visible: boolean
 
@@ -23,10 +32,14 @@ export abstract class Renderable extends EventEmitter {
   constructor(id: string, options: RenderableOptions) {
     super()
     this.id = id
+    this.num = renderableNumber++
     this._x = options.x
     this._y = options.y
+    this._width = options.width
+    this._height = options.height
     this._zIndex = options.zIndex
     this.visible = options.visible !== false
+    Renderable.renderablesByNumber.set(this.num, this)
   }
 
   public set needsUpdate(value: boolean) {
@@ -55,6 +68,22 @@ export abstract class Renderable extends EventEmitter {
 
   public set y(value: number) {
     this._y = value
+  }
+
+  public get width(): number {
+    return this._width
+  }
+
+  public set width(value: number) {
+    this._width = value
+  }
+
+  public get height(): number {
+    return this._height
+  }
+
+  public set height(value: number) {
+    this._height = value
   }
 
   public get zIndex(): number {
@@ -89,10 +118,21 @@ export abstract class Renderable extends EventEmitter {
     }
 
     obj.parent = this
+    if (this.ctx) {
+      obj.ctx = this.ctx
+    }
+
     this.renderableArray.push(obj)
     this.needsZIndexSort = true
     this.renderableMap.set(obj.id, obj)
     this.emit("child:added", obj)
+  }
+
+  public propagateContext(ctx: RenderContext | null): void {
+    this.ctx = ctx
+    for (const child of this.renderableArray) {
+      child.propagateContext(ctx)
+    }
   }
 
   public getRenderable(id: string): Renderable | undefined {
@@ -107,6 +147,7 @@ export abstract class Renderable extends EventEmitter {
       const obj = this.renderableMap.get(id)
       if (obj) {
         obj.parent = null
+        obj.propagateContext(null)
       }
       this.renderableMap.delete(id)
 
@@ -126,20 +167,19 @@ export abstract class Renderable extends EventEmitter {
     return [...this.renderableArray]
   }
 
-  public render(buffer: OptimizedBuffer): void {
+  public render(buffer: OptimizedBuffer, deltaTime: number): void {
     if (!this.visible) return
 
-    this.renderSelf(buffer)
+    this.renderSelf(buffer, deltaTime)
+    this.ctx?.addToHitGrid(this.x, this.y, this.width, this.height, this.num)
     this.ensureZIndexSorted()
 
     for (const child of this.renderableArray) {
-      if (child.visible) {
-        child.render(buffer)
-      }
+      child.render(buffer, deltaTime)
     }
   }
 
-  protected renderSelf(buffer: OptimizedBuffer): void {
+  protected renderSelf(buffer: OptimizedBuffer, deltaTime: number): void {
     // Default implementation: do nothing
     // Override this method to provide custom rendering
   }
@@ -157,6 +197,7 @@ export abstract class Renderable extends EventEmitter {
     }
     this.renderableArray = []
     this.renderableMap.clear()
+    Renderable.renderablesByNumber.delete(this.num)
 
     this.destroySelf()
   }
@@ -164,5 +205,17 @@ export abstract class Renderable extends EventEmitter {
   protected destroySelf(): void {
     // Default implementation: do nothing
     // Override this method to provide custom cleanup
+  }
+
+  public processMouseEvent(event: MouseEvent): void {
+    this.onMouseEvent(event)
+    if (this.parent && !event.defaultPrevented) {
+      this.parent.processMouseEvent(event)
+    }
+  }
+
+  protected onMouseEvent(event: MouseEvent): void {
+    // Default implementation: do nothing
+    // Override this method to provide custom event handling
   }
 }

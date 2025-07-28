@@ -105,6 +105,11 @@ pub const CliRenderer = struct {
     currentOutputBuffer: []u8 = &[_]u8{},
     currentOutputLen: usize = 0,
 
+    // Hit grid for tracking renderable IDs
+    hitGrid: []u32,
+    hitGridWidth: u32,
+    hitGridHeight: u32,
+
     // Preallocated output buffer
     var outputBuffer: [OUTPUT_BUFFER_SIZE]u8 = undefined;
     var outputBufferLen: usize = 0;
@@ -159,6 +164,11 @@ pub const CliRenderer = struct {
         try cellsUpdated.ensureTotalCapacity(STAT_SAMPLE_CAPACITY);
         try frameCallbackTimes.ensureTotalCapacity(STAT_SAMPLE_CAPACITY);
 
+        // Initialize hit grid
+        const hitGridSize = width * height;
+        const hitGrid = try allocator.alloc(u32, hitGridSize);
+        @memset(hitGrid, 0); // Initialize with 0 (no renderable)
+
         self.* = .{
             .width = width,
             .height = height,
@@ -193,6 +203,9 @@ pub const CliRenderer = struct {
             .lastRenderTime = std.time.microTimestamp(),
             .allocator = allocator,
             .stdoutWriter = stdoutWriter,
+            .hitGrid = hitGrid,
+            .hitGridWidth = width,
+            .hitGridHeight = height,
         };
 
         try currentBuffer.clear(.{ self.backgroundColor[0], self.backgroundColor[1], self.backgroundColor[2], 1.0 }, CLEAR_CHAR);
@@ -225,6 +238,8 @@ pub const CliRenderer = struct {
         self.statSamples.stdoutWriteTime.deinit();
         self.statSamples.cellsUpdated.deinit();
         self.statSamples.frameCallbackTime.deinit();
+
+        self.allocator.free(self.hitGrid);
 
         self.allocator.destroy(self);
     }
@@ -301,6 +316,18 @@ pub const CliRenderer = struct {
 
         try self.currentRenderBuffer.clear(.{ 0.0, 0.0, 0.0, 1.0 }, CLEAR_CHAR);
         try self.nextRenderBuffer.clear(.{ self.backgroundColor[0], self.backgroundColor[1], self.backgroundColor[2], 1.0 }, null);
+
+        const newHitGridSize = width * height;
+        const currentHitGridSize = self.hitGridWidth * self.hitGridHeight;
+        if (newHitGridSize > currentHitGridSize) {
+            const newHitGrid = try self.allocator.alloc(u32, newHitGridSize);
+            @memset(newHitGrid, 0);
+
+            self.allocator.free(self.hitGrid);
+            self.hitGrid = newHitGrid;
+            self.hitGridWidth = width;
+            self.hitGridHeight = height;
+        }
 
         globalCursor.mutex.lock();
         globalCursor.x = @min(globalCursor.x, width);
@@ -584,6 +611,41 @@ pub const CliRenderer = struct {
         var bufferedWriter = &self.stdoutWriter;
         bufferedWriter.writer().writeAll(ansi.ANSI.clearAndHome) catch {};
         bufferedWriter.flush() catch {};
+    }
+
+    pub fn addToHitGrid(self: *CliRenderer, x: i32, y: i32, width: u32, height: u32, id: u32) void {
+        const startX = @max(0, x);
+        const startY = @max(0, y);
+        const endX = @min(@as(i32, @intCast(self.hitGridWidth)), x + @as(i32, @intCast(width)));
+        const endY = @min(@as(i32, @intCast(self.hitGridHeight)), y + @as(i32, @intCast(height)));
+
+        if (startX >= endX or startY >= endY) return;
+
+        const uStartX: u32 = @intCast(startX);
+        const uStartY: u32 = @intCast(startY);
+        const uEndX: u32 = @intCast(endX);
+        const uEndY: u32 = @intCast(endY);
+
+        for (uStartY..uEndY) |row| {
+            const rowStart = row * self.hitGridWidth;
+            const startIdx = rowStart + uStartX;
+            const endIdx = rowStart + uEndX;
+
+            @memset(self.hitGrid[startIdx..endIdx], id);
+        }
+    }
+
+    pub fn checkHit(self: *CliRenderer, x: u32, y: u32) u32 {
+        if (x >= self.hitGridWidth or y >= self.hitGridHeight) {
+            return 0;
+        }
+
+        const index = y * self.hitGridWidth + x;
+        return self.hitGrid[index];
+    }
+
+    pub fn clearHitGrid(self: *CliRenderer) void {
+        @memset(self.hitGrid, 0);
     }
 
     fn renderDebugOverlay(self: *CliRenderer) void {

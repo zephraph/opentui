@@ -1,12 +1,13 @@
 import { ANSI } from "./ansi"
 import { FrameBufferRenderable, StyledTextRenderable, type FrameBufferOptions, type StyledTextOptions } from "./objects"
 import { Renderable } from "./Renderable"
-import { type ColorInput, type CursorStyle, DebugOverlayCorner, RGBA } from "./types"
+import { type ColorInput, type CursorStyle, DebugOverlayCorner, type RenderContext, RGBA } from "./types"
 import { parseColor } from "./utils"
 import type { Pointer } from "bun:ffi"
 import { OptimizedBuffer } from "./buffer"
 import { resolveRenderLib, type RenderLib } from "./zig"
 import { TerminalConsole, type ConsoleOptions } from "./console"
+import { parseMouseEvent, type RawMouseEvent } from "./parse.mouse"
 
 export * from "./objects"
 export * from "./Renderable"
@@ -34,12 +35,51 @@ export interface CliRendererConfig {
   consoleOptions?: ConsoleOptions
   resolution?: PixelResolution | null
   postProcessFns?: ((buffer: OptimizedBuffer, deltaTime: number) => void)[]
-  parseKeys?: boolean
+  enableMouseMovement?: boolean
 }
 
 export type PixelResolution = {
   width: number
   height: number
+}
+
+export class MouseEvent {
+  public readonly type: 'press' | 'release' | 'move' | 'drag'
+  public readonly button: number
+  public readonly x: number
+  public readonly y: number
+  public readonly modifiers: {
+    shift: boolean
+    alt: boolean
+    ctrl: boolean
+  }
+  public readonly target: Renderable | null
+  private _defaultPrevented: boolean = false
+
+  public get defaultPrevented(): boolean {
+    return this._defaultPrevented
+  }
+
+  constructor(target: Renderable | null, attributes: RawMouseEvent) {
+    this.target = target
+    this.type = attributes.type
+    this.button = attributes.button
+    this.x = attributes.x
+    this.y = attributes.y
+    this.modifiers = attributes.modifiers
+  }
+
+  public preventDefault(): void {
+    this._defaultPrevented = true
+  }
+}
+
+export enum MouseButton {
+  LEFT = 0,
+  MIDDLE = 1,
+  RIGHT = 2,
+  WHEEL_UP = 4,
+  WHEEL_DOWN = 5,
 }
 
 async function getTerminalPixelResolution(
@@ -111,8 +151,6 @@ let animationFrameId = 0
 export class CliRenderer extends Renderable {
   private lib: RenderLib
   public rendererPtr: Pointer
-  private width: number
-  private height: number
   private stdin: NodeJS.ReadStream
   private stdout: NodeJS.WriteStream
   private exitOnCtrlC: boolean
@@ -168,7 +206,15 @@ export class CliRenderer extends Renderable {
   private animationRequest: Map<number, FrameRequestCallback> = new Map()
 
   private resizeTimeoutId: ReturnType<typeof setTimeout> | null = null
-  private resizeDebounceDelay: number = 100 // 100ms debounce delay
+  private resizeDebounceDelay: number = 100
+
+  private renderContext: RenderContext = {
+    addToHitGrid: (x, y, width, height, id) => {
+      this.lib.addToHitGrid(this.rendererPtr, x, y, width, height, id)
+    },
+  }
+
+  private enableMouseMovement: boolean = false
 
   constructor(
     lib: RenderLib,
@@ -179,7 +225,7 @@ export class CliRenderer extends Renderable {
     height: number,
     config: CliRendererConfig = {},
   ) {
-    super("__cli_renderer__", { x: 0, y: 0, zIndex: 0, visible: true })
+    super("__cli_renderer__", { x: 0, y: 0, zIndex: 0, visible: true, width, height })
 
     this.stdin = stdin
     this.stdout = stdout
@@ -196,6 +242,7 @@ export class CliRenderer extends Renderable {
     this.memorySnapshotInterval = config.memorySnapshotInterval || 5000
     this.gatherStats = config.gatherStats || false
     this.maxStatSamples = config.maxStatSamples || 300
+    this.enableMouseMovement = config.enableMouseMovement || true
     this.nextRenderBuffer = this.lib.getNextBuffer(this.rendererPtr)
     this.currentRenderBuffer = this.lib.getCurrentBuffer(this.rendererPtr)
     this.postProcessFns = config.postProcessFns || []
@@ -255,6 +302,11 @@ export class CliRenderer extends Renderable {
     global.window.requestAnimationFrame = requestAnimationFrame
   }
 
+  public add(obj: Renderable): void {
+    obj.propagateContext(this.renderContext)
+    super.add(obj)
+  }
+
   public get totalFramesRendered(): number {
     return this._totalFramesRendered
   }
@@ -304,23 +356,42 @@ export class CliRenderer extends Renderable {
 
   private setupTerminal(): void {
     this.stdout.write(ANSI.saveCursorState)
-    if (this.exitOnCtrlC) {
-      this.stdin.setRawMode(true)
-      this.stdin.resume()
-      this.stdin.setEncoding("utf8")
+    this.stdin.setRawMode(true)
+    this.stdin.resume()
+    this.stdin.setEncoding("utf8")
+
+    this.stdout.write(ANSI.enableSGRMouseMode)
+    this.stdout.write(ANSI.enableMouseTracking)
+    this.stdout.write(ANSI.enableButtonEventTracking)
+    
+    if (this.enableMouseMovement) {
+      this.stdout.write(ANSI.enableAnyEventTracking)
     }
 
-    if (this.exitOnCtrlC) {
-      this.stdin.on("data", (key: Buffer) => {
-        if (key.toString() === "\u0003") {
-          this.stop()
-          process.nextTick(() => {
-            process.exit(0)
-          })
+    this.stdin.on("data", (data: Buffer) => {
+      if (this.exitOnCtrlC && data.toString() === "\u0003") {
+        this.stop()
+        process.nextTick(() => {
+          process.exit(0)
+        })
+        return
+      }
+
+      const mouseEvent = parseMouseEvent(data)
+
+      if (mouseEvent) {
+        const maybeRenderableId = this.lib.checkHit(this.rendererPtr, mouseEvent.x, mouseEvent.y)
+        const maybeRenderable = Renderable.renderablesByNumber.get(maybeRenderableId)
+        if (maybeRenderable) {
+          const event = new MouseEvent(maybeRenderable, mouseEvent)
+          maybeRenderable.processMouseEvent(event)
         }
-      })
-    }
+        return
+      }
 
+      this.emit("key", data)
+    })
+  
     this.stdout.write(ANSI.switchToAlternateScreen)
     this.setCursorPosition(0, 0, false)
   }
@@ -420,7 +491,7 @@ export class CliRenderer extends Renderable {
     }
     const width = options.width ?? this.width
     const height = options.height ?? this.height
-    const buffer = this.lib.createOptimizedBuffer(width, height, options.tabStopWidth ?? 2, options.respectAlpha)
+    const buffer = this.lib.createOptimizedBuffer(width, height, options.respectAlpha)
     const fbObj = new FrameBufferRenderable(id, buffer, {
       ...options,
       x: options.x ?? 0,
@@ -440,7 +511,7 @@ export class CliRenderer extends Renderable {
 
     const width = options.width ?? this.width
     const height = options.height ?? this.height
-    const buffer = this.lib.createOptimizedBuffer(width, height, 2, true)
+    const buffer = this.lib.createOptimizedBuffer(width, height, true)
     const stObj = new StyledTextRenderable(id, buffer, {
       ...options,
       x: options.x ?? 0,
@@ -538,6 +609,13 @@ export class CliRenderer extends Renderable {
       this.memorySnapshotTimer = null
     }
 
+    if (this.enableMouseMovement) {
+      this.stdout.write(ANSI.disableAnyEventTracking)
+    }
+    this.stdout.write(ANSI.disableButtonEventTracking)
+    this.stdout.write(ANSI.disableMouseTracking)
+    this.stdout.write(ANSI.disableSGRMouseMode)
+
     this.stdout.write(ANSI.switchToMainScreen)
   }
 
@@ -602,7 +680,8 @@ export class CliRenderer extends Renderable {
     this.renderStats.frameCallbackTime = end - start
 
     // Render the renderable tree
-    this.render(this.nextRenderBuffer)
+    this.lib.clearHitGrid(this.rendererPtr)
+    this.render(this.nextRenderBuffer, deltaTime)
 
     for (const postProcessFn of this.postProcessFns) {
       postProcessFn(this.nextRenderBuffer, deltaTime)

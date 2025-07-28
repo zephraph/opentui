@@ -65,22 +65,17 @@ export fn getBufferHeight(bufferPtr: *buffer.OptimizedBuffer) u32 {
     return bufferPtr.height;
 }
 
-export fn getBufferTabStopWidth(bufferPtr: *buffer.OptimizedBuffer) u32 {
-    return bufferPtr.tabStopWidth;
-}
-
 export fn render(rendererPtr: *renderer.CliRenderer) void {
     rendererPtr.render();
 }
 
-export fn createOptimizedBuffer(width: u32, height: u32, tabStopWidth: u8, respectAlpha: bool) ?*buffer.OptimizedBuffer {
+export fn createOptimizedBuffer(width: u32, height: u32, respectAlpha: bool) ?*buffer.OptimizedBuffer {
     if (width == 0 or height == 0) {
         log.warn("Invalid buffer dimensions: {}x{}", .{ width, height });
         return null;
     }
 
     return buffer.OptimizedBuffer.init(allocator, width, height, .{
-        .tabStopWidth = tabStopWidth,
         .respectAlpha = respectAlpha,
     }) catch |err| {
         log.err("Failed to create optimized buffer: {}", .{err});
@@ -194,4 +189,16 @@ export fn bufferResize(bufferPtr: *buffer.OptimizedBuffer, width: u32, height: u
 
 export fn resizeRenderer(rendererPtr: *renderer.CliRenderer, width: u32, height: u32) void {
     rendererPtr.resize(width, height) catch {};
+}
+
+export fn addToHitGrid(rendererPtr: *renderer.CliRenderer, x: i32, y: i32, width: u32, height: u32, id: u32) void {
+    rendererPtr.addToHitGrid(x, y, width, height, id);
+}
+
+export fn checkHit(rendererPtr: *renderer.CliRenderer, x: u32, y: u32) u32 {
+    return rendererPtr.checkHit(x, y);
+}
+
+export fn clearHitGrid(rendererPtr: *renderer.CliRenderer) void {
+    rendererPtr.clearHitGrid();
 }

@@ -8,7 +8,6 @@ pub const Vec3f = @Vector(3, f32);
 pub const Vec4f = @Vector(4, f32);
 
 const INV_255: f32 = 1.0 / 255.0;
-const DEFAULT_TAB_STOP_WIDTH: u8 = 2;
 const DEFAULT_SPACE_CHAR: u32 = 32;
 const MAX_UNICODE_CODEPOINT: u32 = 0x10FFFF;
 const BLOCK_CHAR: u32 = 0x2588; // Full block █
@@ -80,12 +79,10 @@ pub const OptimizedBuffer = struct {
     },
     width: u32,
     height: u32,
-    tabStopWidth: u8,
     respectAlpha: bool,
     allocator: Allocator,
 
     const InitOptions = struct {
-        tabStopWidth: u8 = DEFAULT_TAB_STOP_WIDTH,
         respectAlpha: bool = false,
     };
 
@@ -106,7 +103,6 @@ pub const OptimizedBuffer = struct {
             },
             .width = width,
             .height = height,
-            .tabStopWidth = options.tabStopWidth,
             .respectAlpha = options.respectAlpha,
             .allocator = allocator,
         };
@@ -328,23 +324,8 @@ pub const OptimizedBuffer = struct {
         if (x >= self.width or y >= self.height) return;
         if (text.len == 0) return;
 
-        // Replace tabs with spaces
-        var sanitizedText = std.ArrayList(u8).init(self.allocator);
-        defer sanitizedText.deinit();
-
-        for (text) |c| {
-            if (c == '\t') {
-                var i: usize = 0;
-                while (i < self.tabStopWidth) : (i += 1) {
-                    sanitizedText.append(' ') catch return BufferError.OutOfMemory;
-                }
-            } else {
-                sanitizedText.append(c) catch return BufferError.OutOfMemory;
-            }
-        }
-
         var i: u32 = 0;
-        var utf8_it = std.unicode.Utf8Iterator{ .bytes = sanitizedText.items, .i = 0 };
+        var utf8_it = std.unicode.Utf8Iterator{ .bytes = text, .i = 0 };
         while (utf8_it.nextCodepoint()) |codepoint| : (i += 1) {
             const charX = x + i;
             if (charX >= self.width) break;

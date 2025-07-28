@@ -45,7 +45,7 @@ export interface LayoutOptions {
   }
 }
 
-export interface ElementOptions extends RenderableOptions, Partial<LayoutOptions> {
+export interface ElementOptions extends Omit<RenderableOptions, "width" | "height">, Partial<LayoutOptions> {
   backgroundColor?: ColorInput
   textColor?: ColorInput
   borderStyle?: BorderStyle
@@ -63,19 +63,22 @@ export enum ElementEvents {
 }
 
 export abstract class LayoutElement extends Renderable {
-  protected width: number = 0
-  protected height: number = 0
   protected layoutNode: TrackedNode
   protected parentLayout: ILayout | null = null
   protected _positionType: "absolute" | "relative" = "relative"
   protected _position: Position = {}
-  private _isConstructing: boolean = true
-
-  constructor(id: string, options: RenderableOptions & Partial<LayoutOptions>) {
-    super(id, options)
+  
+  constructor(id: string, options: Omit<RenderableOptions, "width" | "height"> & Partial<LayoutOptions>) {
+    const renderableOptions: RenderableOptions = {
+      ...options,
+      width: typeof options.width === "number" ? options.width : 0,
+      height: typeof options.height === "number" ? options.height : 0,
+    }
+    
+    super(id, renderableOptions)
 
     this.layoutNode = createTrackedNode({ renderable: this } as any)
-    this.setupYogaProperties(options)
+    this.setupYogaProperties({ ...options, ...renderableOptions })
 
     this.width = typeof options.width === "number" ? options.width : 0
     this.height = typeof options.height === "number" ? options.height : 0
@@ -84,7 +87,6 @@ export abstract class LayoutElement extends Renderable {
     const desiredHeight = this.height || "auto"
 
     queueMicrotask(() => {
-      this._isConstructing = false
       this.setWidth(desiredWidth)
       this.setHeight(desiredHeight)
     })

@@ -24,23 +24,36 @@ export interface TextOptions {
   bg?: string | RGBA
   attributes?: number
   visible?: boolean
+  tabStopWidth?: number
+}
+
+export function sanitizeText(text: string, tabStopWidth: number): string {
+  return text.replace(/\t/g, " ".repeat(tabStopWidth))
 }
 
 export class TextRenderable extends Renderable {
-  private _content: string
+  private _content: string = ""
   private _fg: RGBA
   private _bg: RGBA
   public attributes: number = 0
+  public tabStopWidth: number = 2
 
   constructor(id: string, options: TextOptions) {
-    super(id, options)
+    super(id, { ...options, width: 0, height: 0 })
 
     const fgRgb = parseColor(options.fg || RGBA.fromInts(255, 255, 255, 255))
 
-    this._content = options.content
+    this.tabStopWidth = options.tabStopWidth || 2
+    this.setContent(options.content)
     this._fg = fgRgb
     this._bg = options.bg !== undefined ? parseColor(options.bg) : RGBA.fromValues(0, 0, 0, 0)
     this.attributes = options.attributes || 0
+  }
+
+  private setContent(value: string) {
+    this._content = sanitizeText(value, this.tabStopWidth)
+    this.width = this._content.length
+    this.height = 1
   }
 
   get fg(): RGBA {
@@ -66,7 +79,7 @@ export class TextRenderable extends Renderable {
   }
 
   set content(value: string) {
-    this._content = value
+    this.setContent(value)
     this.needsUpdate = true
   }
 
@@ -97,8 +110,6 @@ export interface BoxOptions {
 }
 
 export class BoxRenderable extends Renderable {
-  public width: number
-  public height: number
   public _bg: RGBA
   public _border: boolean | BorderSides[]
   public _borderStyle: BorderStyle
@@ -204,7 +215,6 @@ export interface FrameBufferOptions {
   x: number
   y: number
   zIndex: number
-  tabStopWidth?: number
   respectAlpha?: boolean
 }
 
@@ -226,8 +236,8 @@ export class FrameBufferRenderable extends Renderable {
 }
 
 export class GroupRenderable extends Renderable {
-  constructor(id: string, options: RenderableOptions) {
-    super(id, options)
+  constructor(id: string, options: Omit<RenderableOptions, "width" | "height">) {
+    super(id, { ...options, width: 0, height: 0 })
   }
 }
 

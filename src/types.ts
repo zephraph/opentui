@@ -80,3 +80,7 @@ export enum DebugOverlayCorner {
   bottomLeft = 2,
   bottomRight = 3,
 }
+
+export interface RenderContext {
+  addToHitGrid(x: number, y: number, width: number, height: number, id: number): void
+}

@@ -518,7 +518,6 @@ if (import.meta.main) {
   const renderer = await createCliRenderer({
     exitOnCtrlC: true,
     targetFps: 30,
-    parseKeys: true,
   })
   run(renderer)
   setupStandaloneDemoKeys(renderer)
