@@ -27,6 +27,7 @@ let draggableBoxes: DraggableBox[] = []
 
 class DraggableBox extends BoxRenderable {
   private isDragging = false
+  private gotDrop = ''
   private dragOffsetX = 0
   private dragOffsetY = 0
 
@@ -53,11 +54,19 @@ class DraggableBox extends BoxRenderable {
       const centerY = this.y + Math.floor(this.height / 2)
       buffer.drawText("drag", centerX, centerY, RGBA.fromInts(255, 255, 0))
     }
+
+    if (this.gotDrop) {
+      const centerX = this.x + Math.floor(this.width / 2 - this.gotDrop.length / 2)
+      const centerY = this.y + Math.floor(this.height / 2)
+      buffer.drawText("got", this.x + Math.floor(this.width / 2 - 2), centerY - 1, RGBA.fromInts(255, 255, 0))
+      buffer.drawText(this.gotDrop, centerX, centerY, RGBA.fromInts(255, 255, 0))
+    }
   }
 
   protected onMouseEvent(event: MouseEvent): void {
     switch (event.type) {
-      case 'press':
+      case 'down':
+        this.gotDrop = ''
         this.isDragging = true
         this.dragOffsetX = event.x - this.x
         this.dragOffsetY = event.y - this.y
@@ -65,7 +74,7 @@ class DraggableBox extends BoxRenderable {
         event.preventDefault()
         break
         
-      case 'release':
+      case 'drag-end':
         if (this.isDragging) {
           this.isDragging = false
           this.zIndex = 100
@@ -78,11 +87,15 @@ class DraggableBox extends BoxRenderable {
           this.x = event.x - this.dragOffsetX
           this.y = event.y - this.dragOffsetY
           
-          this.x = Math.max(0, Math.min(this.x, (event.target?.parent?.width || 80) - this.width))
-          this.y = Math.max(4, Math.min(this.y, (event.target?.parent?.height || 24) - this.height))
+          this.x = Math.max(0, Math.min(this.x, (this.ctx?.width() || 80) - this.width))
+          this.y = Math.max(4, Math.min(this.y, (this.ctx?.height() || 24) - this.height))
           
           event.preventDefault()
         }
+        break
+
+      case 'drop':
+        this.gotDrop = event.source?.id || ''
         break
     }
   }
@@ -194,7 +207,7 @@ class MouseInteractionFrameBuffer extends FrameBufferRenderable {
         })
         break
         
-      case 'press':
+      case 'down':
         this.isMousePressed = true
         
         if (this.activatedCells.has(cellKey)) {
@@ -204,7 +217,7 @@ class MouseInteractionFrameBuffer extends FrameBufferRenderable {
         }
         break
         
-      case 'release':
+      case 'drag-end':
         this.isMousePressed = false
         break
     }
@@ -245,10 +258,10 @@ export function run(renderer: CliRenderer): void {
   renderer.add(demoContainer)
 
   draggableBoxes = [
-    new DraggableBox("drag-box-1", 10, 8, 12, 6, RGBA.fromInts(200, 100, 150), "Box 1"),
-    new DraggableBox("drag-box-2", 30, 12, 10, 5, RGBA.fromInts(100, 200, 150), "Box 2"), 
+    new DraggableBox("drag-box-1", 10, 8, 14, 6, RGBA.fromInts(200, 100, 150), "Box 1"),
+    new DraggableBox("drag-box-2", 30, 12, 12, 6, RGBA.fromInts(100, 200, 150), "Box 2"), 
     new DraggableBox("drag-box-3", 50, 15, 14, 7, RGBA.fromInts(150, 150, 200), "Box 3"),
-    new DraggableBox("drag-box-4", 15, 20, 8, 4, RGBA.fromInts(200, 200, 100), "Mini"),
+    new DraggableBox("drag-box-4", 15, 20, 12, 6, RGBA.fromInts(200, 200, 100), "Box 4"),
   ]
 
   for (const box of draggableBoxes) {

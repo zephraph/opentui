@@ -7,7 +7,7 @@ import type { Pointer } from "bun:ffi"
 import { OptimizedBuffer } from "./buffer"
 import { resolveRenderLib, type RenderLib } from "./zig"
 import { TerminalConsole, type ConsoleOptions } from "./console"
-import { parseMouseEvent, type RawMouseEvent } from "./parse.mouse"
+import { parseMouseEvent, type MouseEventType, type RawMouseEvent } from "./parse.mouse"
 
 export * from "./objects"
 export * from "./Renderable"
@@ -44,10 +44,11 @@ export type PixelResolution = {
 }
 
 export class MouseEvent {
-  public readonly type: 'press' | 'release' | 'move' | 'drag'
+  public readonly type: MouseEventType
   public readonly button: number
   public readonly x: number
   public readonly y: number
+  public readonly source?: Renderable
   public readonly modifiers: {
     shift: boolean
     alt: boolean
@@ -60,13 +61,14 @@ export class MouseEvent {
     return this._defaultPrevented
   }
 
-  constructor(target: Renderable | null, attributes: RawMouseEvent) {
+  constructor(target: Renderable | null, attributes: RawMouseEvent & { source?: Renderable }) {
     this.target = target
     this.type = attributes.type
     this.button = attributes.button
     this.x = attributes.x
     this.y = attributes.y
     this.modifiers = attributes.modifiers
+    this.source = attributes.source
   }
 
   public preventDefault(): void {
@@ -174,7 +176,6 @@ export class CliRenderer extends Renderable {
   private rendering: boolean = false
   private renderingNative: boolean = false
   private renderTimeout: Timer | null = null
-  private _totalFramesRendered: number = 0
   private lastTime: number = 0
   private frameCount: number = 0
   private lastFpsTime: number = 0
@@ -210,12 +211,21 @@ export class CliRenderer extends Renderable {
 
   private renderContext: RenderContext = {
     addToHitGrid: (x, y, width, height, id) => {
-      this.lib.addToHitGrid(this.rendererPtr, x, y, width, height, id)
+      if (id !== this.capturedRenderable?.num) {
+        this.lib.addToHitGrid(this.rendererPtr, x, y, width, height, id)
+      }
+    },
+    width: () => {
+      return this.width
+    },
+    height: () => {
+      return this.height
     },
   }
 
   private enableMouseMovement: boolean = false
-
+  private capturedRenderable: Renderable | null = null
+  
   constructor(
     lib: RenderLib,
     rendererPtr: Pointer,
@@ -307,10 +317,6 @@ export class CliRenderer extends Renderable {
     super.add(obj)
   }
 
-  public get totalFramesRendered(): number {
-    return this._totalFramesRendered
-  }
-
   public set needsUpdate(value: boolean) {
     if (!this.updateScheduled && !this._isRunning && value) {
       this.updateScheduled = true
@@ -380,10 +386,27 @@ export class CliRenderer extends Renderable {
       const mouseEvent = parseMouseEvent(data)
 
       if (mouseEvent) {
+        if (this.capturedRenderable && mouseEvent.type !== 'up') {
+          const event = new MouseEvent(this.capturedRenderable, mouseEvent)
+          this.capturedRenderable.processMouseEvent(event)
+          return
+        }
         const maybeRenderableId = this.lib.checkHit(this.rendererPtr, mouseEvent.x, mouseEvent.y)
         const maybeRenderable = Renderable.renderablesByNumber.get(maybeRenderableId)
+        if (this.capturedRenderable && mouseEvent.type === 'up') {
+          const event = new MouseEvent(this.capturedRenderable, { ...mouseEvent, type: 'drag-end' })
+          this.capturedRenderable.processMouseEvent(event)
+          if (maybeRenderable) {
+            const event = new MouseEvent(maybeRenderable, { ...mouseEvent, type: 'drop', source: this.capturedRenderable })
+            maybeRenderable.processMouseEvent(event)
+          }
+          this.capturedRenderable = null
+        }
         if (maybeRenderable) {
           const event = new MouseEvent(maybeRenderable, mouseEvent)
+          if (mouseEvent.type === 'drag') {
+            this.capturedRenderable = maybeRenderable
+          }
           maybeRenderable.processMouseEvent(event)
         }
         return
@@ -649,7 +672,6 @@ export class CliRenderer extends Renderable {
     const deltaTime = elapsed
     this.lastTime = now
 
-    this._totalFramesRendered++
     this.frameCount++
     if (now - this.lastFpsTime >= 1000) {
       this.currentFps = this.frameCount

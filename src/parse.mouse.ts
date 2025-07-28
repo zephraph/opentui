@@ -1,5 +1,6 @@
+export type MouseEventType = 'down' | 'up' | 'move' | 'drag' | 'drag-end' | 'drop'
 export type RawMouseEvent = {
-  type: 'press' | 'release' | 'move' | 'drag'
+  type: MouseEventType
   button: number
   x: number
   y: number
@@ -22,11 +23,11 @@ export function parseMouseEvent(data: Buffer): RawMouseEvent | null {
       ctrl: (rawButtonCode & 16) !== 0,
     }
     
-    let type: 'press' | 'release' | 'move' | 'drag'
+    let type: MouseEventType
     if (isMotion) {
       type = button === 3 ? 'move' : 'drag'
     } else {
-      type = pressRelease === 'M' ? 'press' : 'release'
+      type = pressRelease === 'M' ? 'down' : 'up'
     }
     
     return {
@@ -52,7 +53,7 @@ export function parseMouseEvent(data: Buffer): RawMouseEvent | null {
       ctrl: (buttonByte & 16) !== 0,
     }
     
-    const type = button === 3 ? 'release' : 'press'
+    const type = button === 3 ? 'up' : 'down'
     const actualButton = button === 3 ? 0 : button
     
     return {
