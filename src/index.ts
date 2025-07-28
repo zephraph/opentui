@@ -224,7 +224,9 @@ export class CliRenderer extends Renderable {
   }
 
   private enableMouseMovement: boolean = false
-  private capturedRenderable: Renderable | null = null
+  private capturedRenderable?: Renderable
+  private lastOverRenderableNum: number = 0
+  private lastOverRenderable?: Renderable
   
   constructor(
     lib: RenderLib,
@@ -386,13 +388,29 @@ export class CliRenderer extends Renderable {
       const mouseEvent = parseMouseEvent(data)
 
       if (mouseEvent) {
+        const maybeRenderableId = this.lib.checkHit(this.rendererPtr, mouseEvent.x, mouseEvent.y)
+        const sameElement = maybeRenderableId === this.lastOverRenderableNum
+        this.lastOverRenderableNum = maybeRenderableId
+        const maybeRenderable = Renderable.renderablesByNumber.get(maybeRenderableId)
+
+        if (!sameElement && (mouseEvent.type === 'drag' || mouseEvent.type === 'move')) {
+          if (this.lastOverRenderable && this.lastOverRenderable !== this.capturedRenderable) {
+            const event = new MouseEvent(this.lastOverRenderable, { ...mouseEvent, type: 'out' })
+            this.lastOverRenderable.processMouseEvent(event)
+          }
+          this.lastOverRenderable = maybeRenderable
+          if (maybeRenderable) {
+            const event = new MouseEvent(maybeRenderable, { ...mouseEvent, type: 'over', source: this.capturedRenderable })
+            maybeRenderable.processMouseEvent(event)
+          }
+        }
+
         if (this.capturedRenderable && mouseEvent.type !== 'up') {
           const event = new MouseEvent(this.capturedRenderable, mouseEvent)
           this.capturedRenderable.processMouseEvent(event)
           return
         }
-        const maybeRenderableId = this.lib.checkHit(this.rendererPtr, mouseEvent.x, mouseEvent.y)
-        const maybeRenderable = Renderable.renderablesByNumber.get(maybeRenderableId)
+
         if (this.capturedRenderable && mouseEvent.type === 'up') {
           const event = new MouseEvent(this.capturedRenderable, { ...mouseEvent, type: 'drag-end' })
           this.capturedRenderable.processMouseEvent(event)
@@ -400,15 +418,21 @@ export class CliRenderer extends Renderable {
             const event = new MouseEvent(maybeRenderable, { ...mouseEvent, type: 'drop', source: this.capturedRenderable })
             maybeRenderable.processMouseEvent(event)
           }
-          this.capturedRenderable = null
+          this.lastOverRenderable = this.capturedRenderable
+          this.lastOverRenderableNum = this.capturedRenderable.num
+          this.capturedRenderable = undefined
         }
+
         if (maybeRenderable) {
-          const event = new MouseEvent(maybeRenderable, mouseEvent)
           if (mouseEvent.type === 'drag') {
             this.capturedRenderable = maybeRenderable
           }
+          const event = new MouseEvent(maybeRenderable, mouseEvent)
           maybeRenderable.processMouseEvent(event)
+          return
         }
+
+        this.lastOverRenderable = undefined
         return
       }
 

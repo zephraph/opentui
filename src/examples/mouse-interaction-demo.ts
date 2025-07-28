@@ -27,7 +27,7 @@ let draggableBoxes: DraggableBox[] = []
 
 class DraggableBox extends BoxRenderable {
   private isDragging = false
-  private gotDrop = ''
+  private gotText = ''
   private dragOffsetX = 0
   private dragOffsetY = 0
 
@@ -55,18 +55,19 @@ class DraggableBox extends BoxRenderable {
       buffer.drawText("drag", centerX, centerY, RGBA.fromInts(255, 255, 0))
     }
 
-    if (this.gotDrop) {
-      const centerX = this.x + Math.floor(this.width / 2 - this.gotDrop.length / 2)
+    if (this.gotText) {
+      const centerX = this.x + Math.floor(this.width / 2 - this.gotText.length / 2)
       const centerY = this.y + Math.floor(this.height / 2)
       buffer.drawText("got", this.x + Math.floor(this.width / 2 - 2), centerY - 1, RGBA.fromInts(255, 255, 0))
-      buffer.drawText(this.gotDrop, centerX, centerY, RGBA.fromInts(255, 255, 0))
+      buffer.drawText(this.gotText, centerX, centerY + (this.isDragging ? 1 : 0), RGBA.fromInts(255, 255, 0))
     }
   }
 
   protected onMouseEvent(event: MouseEvent): void {
     switch (event.type) {
       case 'down':
-        this.gotDrop = ''
+        console.log('down', event.x, event.y)
+        this.gotText = ''
         this.isDragging = true
         this.dragOffsetX = event.x - this.x
         this.dragOffsetY = event.y - this.y
@@ -94,8 +95,16 @@ class DraggableBox extends BoxRenderable {
         }
         break
 
+      case 'over':
+        this.gotText = 'over ' + (event.source?.id || 'over')
+        break
+
+      case 'out':
+        this.gotText = 'out'
+        break
+
       case 'drop':
-        this.gotDrop = event.source?.id || ''
+        this.gotText = event.source?.id || ''
         break
     }
   }

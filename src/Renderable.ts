@@ -23,7 +23,7 @@ export abstract class Renderable extends EventEmitter {
   private _height: number
   private _zIndex: number
   public visible: boolean
-
+  
   private renderableMap: Map<string, Renderable> = new Map()
   private renderableArray: Renderable[] = []
   private needsZIndexSort: boolean = false

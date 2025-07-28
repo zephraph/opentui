@@ -1,4 +1,4 @@
-export type MouseEventType = 'down' | 'up' | 'move' | 'drag' | 'drag-end' | 'drop'
+export type MouseEventType = 'down' | 'up' | 'move' | 'drag' | 'drag-end' | 'drop' | 'over' | 'out'
 export type RawMouseEvent = {
   type: MouseEventType
   button: number
