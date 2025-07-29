@@ -25,7 +25,7 @@ bun run src/examples/index.ts
 Renderables are hierarchical objects that can be positioned and rendered to buffers:
 
 ```typescript
-import { Renderable } from "opentui"
+import { Renderable } from "@opentui/core"
 
 class MyRenderable extends Renderable {
   protected renderSelf(buffer: OptimizedBuffer): void {
