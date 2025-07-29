@@ -14,7 +14,7 @@ const SUPPORTED_TARGETS = [_]SupportedTarget{
     .{ .cpu_arch = .aarch64, .os_tag = .linux, .description = "Linux aarch64" },
 };
 
-const LIB_NAME = "renderoo";
+const LIB_NAME = "opentui";
 const ROOT_SOURCE_FILE = "lib.zig";
 
 pub fn build(b: *std.Build) void {

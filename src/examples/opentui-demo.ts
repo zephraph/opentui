@@ -197,7 +197,7 @@ export function run(renderer: CliRenderer): void {
   tabController.addTab({
     title: "Basics",
     init: (tabGroup) => {
-      const title = new TextRenderable("renderoo-title", {
+      const title = new TextRenderable("opentui-title", {
         content: "Basic CLI Renderer Demo",
         x: 10,
         y: 5,

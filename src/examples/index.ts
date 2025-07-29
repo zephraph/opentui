@@ -18,7 +18,7 @@ import * as framebufferExample from "./framebuffer-demo"
 import * as lightsPhongExample from "./lights-phong-demo"
 import * as physxPlanckExample from "./physx-planck-2d-demo"
 import * as physxRapierExample from "./physx-rapier-2d-demo"
-import * as renderooDemo from "./renderoo-demo"
+import * as opentuiDemo from "./opentui-demo"
 import * as nestedZIndexDemo from "./nested-zindex-demo"
 import * as relativePositioningDemo from "./relative-positioning-demo"
 import * as transparencyDemo from "./transparency-demo"
@@ -76,10 +76,10 @@ const examples: Example[] = [
     destroy: boxExample.destroy,
   },
   {
-    name: "Renderoo Demo",
+    name: "OpenTUI Demo",
     description: "Multi-tab demo with various features",
-    run: renderooDemo.run,
-    destroy: renderooDemo.destroy,
+    run: opentuiDemo.run,
+    destroy: opentuiDemo.destroy,
   },
   {
     name: "Nested Z-Index Demo",
@@ -208,7 +208,7 @@ class ExampleSelector {
   }
 
   private createTitle(width: number, height: number): void {
-    const titleText = "RENDEROO EXAMPLES"
+    const titleText = "OPENTUI EXAMPLES"
     const titleFont = "tiny"
     const { width: titleWidth, height: titleHeight } = measureText({ text: titleText, font: titleFont })
     const centerX = Math.floor(width / 2) - Math.floor(titleWidth / 2)

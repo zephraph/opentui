@@ -1,4 +1,4 @@
-# Agent Guidelines for Renderoo
+# Agent Guidelines for opentui
 
 Default to using Bun instead of Node.js.
 

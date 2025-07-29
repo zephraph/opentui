@@ -1,5 +1,5 @@
 {
-  "name": "renderoo",
+  "name": "@opentui/core",
   "module": "src/index.ts",
   "main": "src/index.js",
   "version": "0.1.0",

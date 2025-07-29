@@ -34,16 +34,16 @@ function findLibrary(): string {
   // First try target-specific directory
   const [arch, os] = target.split("-")
   const isWindows = os === "windows"
-  const libraryName = isWindows ? "renderoo" : "librenderoo"
+  const libraryName = isWindows ? "opentui" : "libopentui"
   const targetLibPath = join(libDir, target, `${libraryName}.${suffix}`)
   if (existsSync(targetLibPath)) {
     return targetLibPath
   }
 
-  throw new Error(`Could not find renderoo library for platform: ${target}`)
+  throw new Error(`Could not find opentui library for platform: ${target}`)
 }
 
-function getRenderooLib(libPath?: string) {
+function getOpenTUILib(libPath?: string) {
   const resolvedLibPath = libPath || findLibrary()
 
   return dlopen(resolvedLibPath, {
@@ -301,45 +301,45 @@ export interface RenderLib {
 }
 
 class FFIRenderLib implements RenderLib {
-  private renderoo: ReturnType<typeof getRenderooLib>
+  private opentui: ReturnType<typeof getOpenTUILib>
   private encoder: TextEncoder = new TextEncoder()
 
   constructor(libPath?: string) {
-    this.renderoo = getRenderooLib(libPath)
+    this.opentui = getOpenTUILib(libPath)
   }
 
   public createRenderer(width: number, height: number) {
-    return this.renderoo.symbols.createRenderer(width, height)
+    return this.opentui.symbols.createRenderer(width, height)
   }
 
   public destroyRenderer(renderer: Pointer) {
-    this.renderoo.symbols.destroyRenderer(renderer)
+    this.opentui.symbols.destroyRenderer(renderer)
   }
 
   public setUseThread(renderer: Pointer, useThread: boolean) {
-    this.renderoo.symbols.setUseThread(renderer, useThread)
+    this.opentui.symbols.setUseThread(renderer, useThread)
   }
 
   public setBackgroundColor(renderer: Pointer, color: RGBA) {
-    this.renderoo.symbols.setBackgroundColor(renderer, color.buffer)
+    this.opentui.symbols.setBackgroundColor(renderer, color.buffer)
   }
 
   public updateStats(renderer: Pointer, time: number, fps: number, frameCallbackTime: number) {
-    this.renderoo.symbols.updateStats(renderer, time, fps, frameCallbackTime)
+    this.opentui.symbols.updateStats(renderer, time, fps, frameCallbackTime)
   }
 
   public updateMemoryStats(renderer: Pointer, heapUsed: number, heapTotal: number, arrayBuffers: number) {
-    this.renderoo.symbols.updateMemoryStats(renderer, heapUsed, heapTotal, arrayBuffers)
+    this.opentui.symbols.updateMemoryStats(renderer, heapUsed, heapTotal, arrayBuffers)
   }
 
   public getNextBuffer(renderer: Pointer): OptimizedBuffer {
-    const bufferPtr = this.renderoo.symbols.getNextBuffer(renderer)
+    const bufferPtr = this.opentui.symbols.getNextBuffer(renderer)
     if (!bufferPtr) {
       throw new Error("Failed to get next buffer")
     }
 
-    const width = this.renderoo.symbols.getBufferWidth(bufferPtr)
-    const height = this.renderoo.symbols.getBufferHeight(bufferPtr)
+    const width = this.opentui.symbols.getBufferWidth(bufferPtr)
+    const height = this.opentui.symbols.getBufferHeight(bufferPtr)
     const size = width * height
     const buffers = this.getBuffer(bufferPtr, size)
 
@@ -347,13 +347,13 @@ class FFIRenderLib implements RenderLib {
   }
 
   public getCurrentBuffer(renderer: Pointer): OptimizedBuffer {
-    const bufferPtr = this.renderoo.symbols.getCurrentBuffer(renderer)
+    const bufferPtr = this.opentui.symbols.getCurrentBuffer(renderer)
     if (!bufferPtr) {
       throw new Error("Failed to get current buffer")
     }
 
-    const width = this.renderoo.symbols.getBufferWidth(bufferPtr)
-    const height = this.renderoo.symbols.getBufferHeight(bufferPtr)
+    const width = this.opentui.symbols.getBufferWidth(bufferPtr)
+    const height = this.opentui.symbols.getBufferHeight(bufferPtr)
     const size = width * height
     const buffers = this.getBuffer(bufferPtr, size)
 
@@ -369,10 +369,10 @@ class FFIRenderLib implements RenderLib {
     bg: Float32Array
     attributes: Uint8Array
   } {
-    const charPtr = this.renderoo.symbols.bufferGetCharPtr(bufferPtr)
-    const fgPtr = this.renderoo.symbols.bufferGetFgPtr(bufferPtr)
-    const bgPtr = this.renderoo.symbols.bufferGetBgPtr(bufferPtr)
-    const attributesPtr = this.renderoo.symbols.bufferGetAttributesPtr(bufferPtr)
+    const charPtr = this.opentui.symbols.bufferGetCharPtr(bufferPtr)
+    const fgPtr = this.opentui.symbols.bufferGetFgPtr(bufferPtr)
+    const bgPtr = this.opentui.symbols.bufferGetBgPtr(bufferPtr)
+    const attributesPtr = this.opentui.symbols.bufferGetAttributesPtr(bufferPtr)
 
     if (!charPtr || !fgPtr || !bgPtr || !attributesPtr) {
       throw new Error("Failed to get buffer pointers")
@@ -389,7 +389,7 @@ class FFIRenderLib implements RenderLib {
   }
 
   public bufferGetCharPtr(buffer: Pointer): Pointer {
-    const ptr = this.renderoo.symbols.bufferGetCharPtr(buffer)
+    const ptr = this.opentui.symbols.bufferGetCharPtr(buffer)
     if (!ptr) {
       throw new Error("Failed to get char pointer")
     }
@@ -397,7 +397,7 @@ class FFIRenderLib implements RenderLib {
   }
 
   public bufferGetFgPtr(buffer: Pointer): Pointer {
-    const ptr = this.renderoo.symbols.bufferGetFgPtr(buffer)
+    const ptr = this.opentui.symbols.bufferGetFgPtr(buffer)
     if (!ptr) {
       throw new Error("Failed to get fg pointer")
     }
@@ -405,7 +405,7 @@ class FFIRenderLib implements RenderLib {
   }
 
   public bufferGetBgPtr(buffer: Pointer): Pointer {
-    const ptr = this.renderoo.symbols.bufferGetBgPtr(buffer)
+    const ptr = this.opentui.symbols.bufferGetBgPtr(buffer)
     if (!ptr) {
       throw new Error("Failed to get bg pointer")
     }
@@ -413,7 +413,7 @@ class FFIRenderLib implements RenderLib {
   }
 
   public bufferGetAttributesPtr(buffer: Pointer): Pointer {
-    const ptr = this.renderoo.symbols.bufferGetAttributesPtr(buffer)
+    const ptr = this.opentui.symbols.bufferGetAttributesPtr(buffer)
     if (!ptr) {
       throw new Error("Failed to get attributes pointer")
     }
@@ -421,23 +421,23 @@ class FFIRenderLib implements RenderLib {
   }
 
   public bufferGetRespectAlpha(buffer: Pointer): boolean {
-    return this.renderoo.symbols.bufferGetRespectAlpha(buffer)
+    return this.opentui.symbols.bufferGetRespectAlpha(buffer)
   }
 
   public bufferSetRespectAlpha(buffer: Pointer, respectAlpha: boolean): void {
-    this.renderoo.symbols.bufferSetRespectAlpha(buffer, respectAlpha)
+    this.opentui.symbols.bufferSetRespectAlpha(buffer, respectAlpha)
   }
 
   public getBufferWidth(buffer: Pointer): number {
-    return this.renderoo.symbols.getBufferWidth(buffer)
+    return this.opentui.symbols.getBufferWidth(buffer)
   }
 
   public getBufferHeight(buffer: Pointer): number {
-    return this.renderoo.symbols.getBufferHeight(buffer)
+    return this.opentui.symbols.getBufferHeight(buffer)
   }
 
   public bufferClear(buffer: Pointer, color: RGBA) {
-    this.renderoo.symbols.bufferClear(buffer, color.buffer)
+    this.opentui.symbols.bufferClear(buffer, color.buffer)
   }
 
   public bufferDrawText(
@@ -454,7 +454,7 @@ class FFIRenderLib implements RenderLib {
     const bg = bgColor ? bgColor.buffer : null
     const fg = color.buffer
 
-    this.renderoo.symbols.bufferDrawText(buffer, textBytes, textLength, x, y, fg, bg, attributes ?? 0)
+    this.opentui.symbols.bufferDrawText(buffer, textBytes, textLength, x, y, fg, bg, attributes ?? 0)
   }
 
   public bufferSetCellWithAlphaBlending(
@@ -470,12 +470,12 @@ class FFIRenderLib implements RenderLib {
     const bg = bgColor.buffer
     const fg = color.buffer
 
-    this.renderoo.symbols.bufferSetCellWithAlphaBlending(buffer, x, y, charPtr, fg, bg, attributes ?? 0)
+    this.opentui.symbols.bufferSetCellWithAlphaBlending(buffer, x, y, charPtr, fg, bg, attributes ?? 0)
   }
 
   public bufferFillRect(buffer: Pointer, x: number, y: number, width: number, height: number, color: RGBA) {
     const bg = color.buffer
-    this.renderoo.symbols.bufferFillRect(buffer, x, y, width, height, bg)
+    this.opentui.symbols.bufferFillRect(buffer, x, y, width, height, bg)
   }
 
   public bufferDrawSuperSampleBuffer(
@@ -488,7 +488,7 @@ class FFIRenderLib implements RenderLib {
     alignedBytesPerRow: number,
   ): void {
     const formatId = format === "bgra8unorm" ? 0 : 1
-    this.renderoo.symbols.bufferDrawSuperSampleBuffer(
+    this.opentui.symbols.bufferDrawSuperSampleBuffer(
       buffer,
       x,
       y,
@@ -508,7 +508,7 @@ class FFIRenderLib implements RenderLib {
     terminalWidthCells: number,
     terminalHeightCells: number,
   ): void {
-    this.renderoo.symbols.bufferDrawPackedBuffer(
+    this.opentui.symbols.bufferDrawPackedBuffer(
       buffer,
       dataPtr,
       dataLen,
@@ -529,30 +529,30 @@ class FFIRenderLib implements RenderLib {
     bg: Float32Array
     attributes: Uint8Array
   } {
-    this.renderoo.symbols.bufferResize(buffer, width, height)
+    this.opentui.symbols.bufferResize(buffer, width, height)
     const buffers = this.getBuffer(buffer, width * height)
     return buffers
   }
 
   public resizeRenderer(renderer: Pointer, width: number, height: number) {
-    this.renderoo.symbols.resizeRenderer(renderer, width, height)
+    this.opentui.symbols.resizeRenderer(renderer, width, height)
   }
 
   public setCursorPosition(x: number, y: number, visible: boolean) {
-    this.renderoo.symbols.setCursorPosition(x, y, visible)
+    this.opentui.symbols.setCursorPosition(x, y, visible)
   }
 
   public setCursorStyle(style: CursorStyle, blinking: boolean) {
     const stylePtr = this.encoder.encode(style)
-    this.renderoo.symbols.setCursorStyle(stylePtr, style.length, blinking)
+    this.opentui.symbols.setCursorStyle(stylePtr, style.length, blinking)
   }
 
   public setCursorColor(color: RGBA) {
-    this.renderoo.symbols.setCursorColor(color.buffer)
+    this.opentui.symbols.setCursorColor(color.buffer)
   }
 
   public render(renderer: Pointer) {
-    this.renderoo.symbols.render(renderer)
+    this.opentui.symbols.render(renderer)
   }
 
   public createOptimizedBuffer(
@@ -560,7 +560,7 @@ class FFIRenderLib implements RenderLib {
     height: number,
     respectAlpha: boolean = false,
   ): OptimizedBuffer {
-    const bufferPtr = this.renderoo.symbols.createOptimizedBuffer(width, height, respectAlpha)
+    const bufferPtr = this.opentui.symbols.createOptimizedBuffer(width, height, respectAlpha)
     if (!bufferPtr) {
       throw new Error("Failed to create optimized buffer")
     }
@@ -571,7 +571,7 @@ class FFIRenderLib implements RenderLib {
   }
 
   public destroyOptimizedBuffer(bufferPtr: Pointer) {
-    this.renderoo.symbols.destroyOptimizedBuffer(bufferPtr)
+    this.opentui.symbols.destroyOptimizedBuffer(bufferPtr)
   }
 
   public drawFrameBuffer(
@@ -588,40 +588,40 @@ class FFIRenderLib implements RenderLib {
     const srcY = sourceY ?? 0
     const srcWidth = sourceWidth ?? 0
     const srcHeight = sourceHeight ?? 0
-    this.renderoo.symbols.drawFrameBuffer(targetBufferPtr, destX, destY, bufferPtr, srcX, srcY, srcWidth, srcHeight)
+    this.opentui.symbols.drawFrameBuffer(targetBufferPtr, destX, destY, bufferPtr, srcX, srcY, srcWidth, srcHeight)
   }
 
   public setDebugOverlay(renderer: Pointer, enabled: boolean, corner: DebugOverlayCorner) {
-    this.renderoo.symbols.setDebugOverlay(renderer, enabled, corner)
+    this.opentui.symbols.setDebugOverlay(renderer, enabled, corner)
   }
 
   public clearTerminal(renderer: Pointer) {
-    this.renderoo.symbols.clearTerminal(renderer)
+    this.opentui.symbols.clearTerminal(renderer)
   }
 
   public addToHitGrid(renderer: Pointer, x: number, y: number, width: number, height: number, id: number) {
-    this.renderoo.symbols.addToHitGrid(renderer, x, y, width, height, id)
+    this.opentui.symbols.addToHitGrid(renderer, x, y, width, height, id)
   }
 
   public checkHit(renderer: Pointer, x: number, y: number): number {
-    return this.renderoo.symbols.checkHit(renderer, x, y)
+    return this.opentui.symbols.checkHit(renderer, x, y)
   }
 
   public clearHitGrid(renderer: Pointer) {
-    this.renderoo.symbols.clearHitGrid(renderer)
+    this.opentui.symbols.clearHitGrid(renderer)
   }
 }
 
-let renderooLibPath: string | undefined
-let renderooLib: RenderLib | undefined
+let opentuiLibPath: string | undefined
+let opentuiLib: RenderLib | undefined
 
 export function setRenderLibPath(libPath: string) {
-  renderooLibPath = libPath
+  opentuiLibPath = libPath
 }
 
 export function resolveRenderLib(): RenderLib {
-  if (!renderooLib) {
-    renderooLib = new FFIRenderLib(renderooLibPath)
+  if (!opentuiLib) {
+    opentuiLib = new FFIRenderLib(opentuiLibPath)
   }
-  return renderooLib
+  return opentuiLib
 }
