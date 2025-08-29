@@ -45,6 +45,7 @@ import * as vnodeCompositionDemo from "./vnode-composition-demo"
 import * as hastSyntaxHighlightingExample from "./hast-syntax-highlighting-demo"
 import * as liveStateExample from "./live-state-demo"
 import * as fullUnicodeExample from "./full-unicode-demo"
+import * as anchorDemo from "./anchor-demo"
 import { getKeyHandler } from "../lib/KeyHandler"
 import { setupCommonDemoKeys } from "./lib/standalone-keys"
 
@@ -133,6 +134,12 @@ const examples: Example[] = [
     description: "Shows how child positions are relative to their parent containers",
     run: relativePositioningDemo.run,
     destroy: relativePositioningDemo.destroy,
+  },
+  {
+    name: "Anchor Demo",
+    description: "Click boxes to spawn anchored boxes that follow their targets using the anchor API",
+    run: anchorDemo.run,
+    destroy: anchorDemo.destroy,
   },
   {
     name: "Transparency Demo",
