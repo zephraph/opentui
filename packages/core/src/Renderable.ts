@@ -474,7 +474,7 @@ export abstract class Renderable extends EventEmitter {
         if (!this._anchor) {
           return this._x
         }
-        return this._x + this.getParentInsetCorrection().x + this.getAnchorPointX()
+        return this.getAnchorPointX()
       case "relative":
         return this._x + this.getAnchorPointX()
       case "static":
@@ -494,7 +494,7 @@ export abstract class Renderable extends EventEmitter {
         if (!this._anchor) {
           return this._y
         }
-        return this._y + this.getParentInsetCorrection().y + this.getAnchorPointY()
+        return this.getAnchorPointY()
       case "relative":
         return this._y + this.getAnchorPointY()
       case "static":
@@ -950,24 +950,6 @@ export abstract class Renderable extends EventEmitter {
     }
   }
 
-  protected getParentInsetCorrection(): { x: number; y: number } {
-    let correctionX = 0
-    let correctionY = 0
-
-    if (this.parent && this._anchor) {
-      correctionX -=
-        this.parent.getLayoutNode().yogaNode.getComputedPadding(Edge.Left) +
-        this.parent.getLayoutNode().yogaNode.getComputedMargin(Edge.Left) +
-        this.parent.getLayoutNode().yogaNode.getComputedBorder(Edge.Left)
-      correctionY -=
-        this.parent.getLayoutNode().yogaNode.getComputedPadding(Edge.Top) +
-        this.parent.getLayoutNode().yogaNode.getComputedMargin(Edge.Top) +
-        this.parent.getLayoutNode().yogaNode.getComputedBorder(Edge.Top)
-    }
-
-    return { x: correctionX, y: correctionY }
-  }
-
   protected getAnchorPointX(): number {
     let finalX = 0
     const anchor = this._anchor
@@ -1221,7 +1203,6 @@ export abstract class Renderable extends EventEmitter {
 
     if (this._deferredRender && !this._waitingForDeferredRender) {
       this._waitingForDeferredRender = true
-      console.log("deferring renderable", this.id)
       this.ctx.deferRender(this)
       return
     }
@@ -1436,13 +1417,8 @@ export class RootRenderable extends Renderable {
   public render(buffer: OptimizedBuffer, deltaTime: number): void {
     super.render(buffer, deltaTime)
     const deferredRenderables = this._ctx.getDeferredRenderables()
-    console.log(
-      "deferredRenderables",
-      deferredRenderables.map((r) => r.id),
-    )
     if (deferredRenderables.length > 0) {
       for (const renderable of deferredRenderables) {
-        console.log("rendering deferred renderable", renderable.id)
         renderable.render(buffer, deltaTime)
       }
     }
