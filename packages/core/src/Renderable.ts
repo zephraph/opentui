@@ -18,7 +18,6 @@ import {
 import type { MouseEvent } from "./renderer"
 import type { RenderContext, SelectionState } from "./types"
 import { ensureRenderable, type VNode } from "./renderables/composition/vnode"
-import type { SHA224 } from "bun"
 
 export enum LayoutEvents {
   LAYOUT_CHANGED = "layout-changed",
@@ -257,10 +256,11 @@ export abstract class Renderable extends EventEmitter {
 
   private renderableMap: Map<string, Renderable> = new Map()
   private renderableArray: Renderable[] = []
-  private anchoredRenderableArray: Renderable[] = []
   private needsZIndexSort: boolean = false
   public parent: Renderable | null = null
-  public anchor: Renderable | null = null
+  private _anchor: Renderable | null = null
+  public _deferredRender: boolean = false
+  public _waitingForDeferredRender: boolean = false
 
   public renderBefore?: (this: Renderable, buffer: OptimizedBuffer, deltaTime: number) => void
   public renderAfter?: (this: Renderable, buffer: OptimizedBuffer, deltaTime: number) => void
@@ -299,7 +299,7 @@ export abstract class Renderable extends EventEmitter {
 
     // anchor properties
     if (options.positionAnchor) {
-      this.anchor = options.positionAnchor
+      this.positionAnchor = options.positionAnchor
     }
     this._justifySelf = options.justifySelf
     this._alignSelf = options.alignSelf
@@ -471,7 +471,7 @@ export abstract class Renderable extends EventEmitter {
   public get x(): number {
     switch (this._positionType) {
       case "absolute":
-        if (!this.anchor) {
+        if (!this._anchor) {
           return this._x
         }
         return this._x + this.getParentInsetCorrection().x + this.getAnchorPointX()
@@ -491,7 +491,7 @@ export abstract class Renderable extends EventEmitter {
   public get y(): number {
     switch (this._positionType) {
       case "absolute":
-        if (!this.anchor) {
+        if (!this._anchor) {
           return this._y
         }
         return this._y + this.getParentInsetCorrection().y + this.getAnchorPointY()
@@ -549,18 +549,22 @@ export abstract class Renderable extends EventEmitter {
   }
 
   public get positionAnchor(): Renderable | null {
-    return this.anchor
+    return this._anchor
   }
 
   public set positionAnchor(anchor: Renderable | null) {
-    if (anchor !== this.anchor) {
-      if (this.anchor) this.anchor.detach(this)
+    if (anchor !== this._anchor) {
+      if (this._anchor) this._anchor.detach(this)
 
       if (anchor) {
         anchor.attach(this)
+        this._deferredRender = true
         this._positionType = "absolute"
         this.layoutNode.yogaNode.setPositionType(PositionType.Absolute)
+      } else {
+        this._deferredRender = false
       }
+
       this.needsUpdate()
     }
   }
@@ -588,8 +592,8 @@ export abstract class Renderable extends EventEmitter {
   }
 
   public get width(): number {
-    if (this.anchor && this.left === "anchor-left" && this.right === "anchor-right") {
-      return this.anchor.width
+    if (this._anchor && this.left === "anchor-left" && this.right === "anchor-right") {
+      return this._anchor.width
     }
     return this._widthValue
   }
@@ -615,9 +619,6 @@ export abstract class Renderable extends EventEmitter {
   }
 
   public get zIndex(): number {
-    if (this.anchoredRenderableArray.filter((x) => x.visible).length > 0) {
-      return Number.POSITIVE_INFINITY
-    }
     return this._zIndex
   }
 
@@ -625,8 +626,8 @@ export abstract class Renderable extends EventEmitter {
     if (this._zIndex !== value) {
       this._zIndex = value
 
-      if (this.anchor) {
-        this.anchor.requestZIndexSort()
+      if (this._anchor) {
+        this._anchor.requestZIndexSort()
         return
       }
       this.parent?.requestZIndexSort()
@@ -640,14 +641,6 @@ export abstract class Renderable extends EventEmitter {
   private ensureZIndexSorted(): void {
     if (this.needsZIndexSort) {
       this.renderableArray.sort((a, b) => (a.zIndex > b.zIndex ? 1 : a.zIndex < b.zIndex ? -1 : 0))
-      if (this.id === "box-8") {
-        console.log(
-          "sort",
-          this.id,
-          this.renderableArray.map((x) => `${x.id} ${x.zIndex} ${x.anchoredRenderableArray[0]?.visible}`),
-        )
-      }
-      this.anchoredRenderableArray.sort((a, b) => (a.zIndex > b.zIndex ? 1 : a.zIndex < b.zIndex ? -1 : 0))
       this.needsZIndexSort = false
     }
   }
@@ -961,7 +954,7 @@ export abstract class Renderable extends EventEmitter {
     let correctionX = 0
     let correctionY = 0
 
-    if (this.parent && this.anchor) {
+    if (this.parent && this._anchor) {
       correctionX -=
         this.parent.getLayoutNode().yogaNode.getComputedPadding(Edge.Left) +
         this.parent.getLayoutNode().yogaNode.getComputedMargin(Edge.Left) +
@@ -977,7 +970,7 @@ export abstract class Renderable extends EventEmitter {
 
   protected getAnchorPointX(): number {
     let finalX = 0
-    const anchor = this.anchor
+    const anchor = this._anchor
 
     if (anchor) {
       const width = this.width
@@ -1014,7 +1007,7 @@ export abstract class Renderable extends EventEmitter {
 
   protected getAnchorPointY(): number {
     let finalY = 0
-    const anchor = this.anchor
+    const anchor = this._anchor
 
     if (anchor) {
       const height = this.height
@@ -1101,26 +1094,18 @@ export abstract class Renderable extends EventEmitter {
   }
 
   public attach(obj: Renderable): void {
-    const existing = this.anchoredRenderableArray.indexOf(obj)
-    if (existing !== -1) {
-      this.anchoredRenderableArray.splice(existing, 1)
+    if (obj._anchor) {
+      obj._anchor.detach(obj)
     }
-
-    if (obj.anchor) {
-      obj.anchor.detach(obj)
-    }
-    obj.anchor = this
-    this.anchoredRenderableArray.push(obj)
-    this.needsZIndexSort = true
+    obj._anchor = this
 
     this.needsUpdate()
   }
 
   public detach(obj: Renderable): void {
-    const existing = this.anchoredRenderableArray.indexOf(obj)
-    if (existing !== -1) {
-      this.anchoredRenderableArray.splice(existing, 1)
-      obj.anchor = null
+    if (obj._anchor) {
+      obj._anchor.detach(obj)
+      obj._anchor = null
       this.needsUpdate()
     }
   }
@@ -1231,13 +1216,16 @@ export abstract class Renderable extends EventEmitter {
     return [...this.renderableArray]
   }
 
-  public render(buffer: OptimizedBuffer, deltaTime: number, resumed?: boolean): void {
+  public render(buffer: OptimizedBuffer, deltaTime: number): void {
     if (!this.visible) return
 
-    // Hold off rendering until the anchor is ready
-    if (this.anchor && !resumed) {
+    if (this._deferredRender && !this._waitingForDeferredRender) {
+      this._waitingForDeferredRender = true
+      console.log("deferring renderable", this.id)
+      this.ctx.deferRender(this)
       return
     }
+    this._waitingForDeferredRender = false
 
     this.beforeRender()
     this.updateFromLayout()
@@ -1265,10 +1253,6 @@ export abstract class Renderable extends EventEmitter {
       child.render(renderBuffer, deltaTime)
     }
 
-    for (const anchoredChild of this.anchoredRenderableArray) {
-      anchoredChild.render(renderBuffer, deltaTime, true)
-    }
-
     if (this.buffered && this.frameBuffer) {
       buffer.drawFrameBuffer(this.x, this.y, this.frameBuffer)
     }
@@ -1289,8 +1273,8 @@ export abstract class Renderable extends EventEmitter {
       this.parent.remove(this.id)
     }
 
-    if (this.anchor) {
-      this.anchor.detach(this)
+    if (this._anchor) {
+      this._anchor.detach(this)
     }
 
     if (this.frameBuffer) {
@@ -1301,10 +1285,6 @@ export abstract class Renderable extends EventEmitter {
     for (const child of this.renderableArray) {
       child.parent = null
       child.destroy()
-    }
-
-    for (const child of this.anchoredRenderableArray) {
-      child.anchor = null
     }
 
     this.renderableArray = []
@@ -1451,6 +1431,21 @@ export class RootRenderable extends Renderable {
     this.layoutNode.yogaNode.setFlexDirection(FlexDirection.Column)
 
     this.calculateLayout()
+  }
+
+  public render(buffer: OptimizedBuffer, deltaTime: number): void {
+    super.render(buffer, deltaTime)
+    const deferredRenderables = this._ctx.getDeferredRenderables()
+    console.log(
+      "deferredRenderables",
+      deferredRenderables.map((r) => r.id),
+    )
+    if (deferredRenderables.length > 0) {
+      for (const renderable of deferredRenderables) {
+        console.log("rendering deferred renderable", renderable.id)
+        renderable.render(buffer, deltaTime)
+      }
+    }
   }
 
   protected propagateLiveCount(delta: number): void {

@@ -748,6 +748,17 @@ export class CliRenderer extends EventEmitter implements RenderContext {
     return false
   }
 
+  private deferredRenderables: Renderable[] = []
+  public deferRender(renderable: Renderable): void {
+    this.deferredRenderables.push(renderable)
+  }
+  private resetDeferredRenderables(): void {
+    this.deferredRenderables = []
+  }
+  public getDeferredRenderables(): Renderable[] {
+    return this.deferredRenderables
+  }
+
   private takeMemorySnapshot(): void {
     const memoryUsage = process.memoryUsage()
     this.lastMemorySnapshot = {
@@ -1091,6 +1102,8 @@ export class CliRenderer extends EventEmitter implements RenderContext {
     }
     const end = performance.now()
     this.renderStats.frameCallbackTime = end - start
+
+    this.resetDeferredRenderables()
 
     // Render the renderable tree
     this.root.render(this.nextRenderBuffer, deltaTime)

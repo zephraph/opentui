@@ -1,4 +1,5 @@
 import type { RGBA } from "./lib/RGBA"
+import type { Renderable } from "./Renderable"
 
 export const TextAttributes = {
   NONE: 0,
@@ -35,6 +36,8 @@ export interface RenderContext {
   capabilities: any | null
   requestLive: () => void
   dropLive: () => void
+  deferRender: (renderable: Renderable) => void
+  getDeferredRenderables: () => Renderable[]
 }
 
 export interface SelectionState {
