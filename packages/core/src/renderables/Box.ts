@@ -175,7 +175,7 @@ export class BoxRenderable extends Renderable {
       borderColor: currentBorderColor,
       backgroundColor: this._backgroundColor,
       shouldFill: this.shouldFill,
-      title: this._title,
+      title: this._title + ' ' + this.id,
       titleAlignment: this._titleAlignment,
     })
   }

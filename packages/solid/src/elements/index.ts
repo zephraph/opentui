@@ -42,6 +42,7 @@ type ElementProps<
   K extends Renderable = Renderable,
   NonStyleKeys extends keyof T = RenderableNonStyleKeys,
 > = {
+  focused?: boolean
   style?: Omit<T, NonStyleKeys | RenderableNonStyleKeys>
   ref?: Ref<K>
 } & T
@@ -63,7 +64,6 @@ export type InputElementProps = ElementProps<
   onInput?: (value: string) => void
   onSubmit?: (value: string) => void
   onChange?: (value: string) => void
-  focused?: boolean
 }
 export type InputStyle = InputElementProps["style"]
 
@@ -75,7 +75,6 @@ export type TabSelectElementProps = ElementProps<
 > & {
   onSelect?: TabSelectEventCallback
   onChange?: TabSelectEventCallback
-  focused?: boolean
 }
 export type TabSelectStyle = TabSelectElementProps["style"]
 

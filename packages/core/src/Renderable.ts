@@ -2,7 +2,7 @@ import { OptimizedBuffer } from "./buffer"
 import type { RenderContext, SelectionState } from "./types"
 import type { MouseEvent } from "./renderer"
 import { EventEmitter } from "events"
-import Yoga, { FlexDirection, Direction, Edge, type Config, Display } from "yoga-layout"
+import Yoga, { FlexDirection, Direction, Edge, type Config, Display, PositionType } from "yoga-layout"
 import { TrackedNode, createTrackedNode } from "./lib/TrackedNode"
 import type { ParsedKey } from "./lib/parse.keypress"
 import { getKeyHandler, type KeyHandler } from "./lib/KeyHandler"
@@ -17,6 +17,7 @@ import {
   type JustifyString,
   type PositionTypeString,
 } from "./lib/yoga.options"
+import type { SHA224 } from "bun"
 
 export enum LayoutEvents {
   LAYOUT_CHANGED = "layout-changed",
@@ -31,11 +32,16 @@ export enum RenderableEvents {
 }
 
 export interface Position {
-  top?: number | "auto" | `${number}%`
-  right?: number | "auto" | `${number}%`
-  bottom?: number | "auto" | `${number}%`
-  left?: number | "auto" | `${number}%`
+  top?: ExtendedPositionValue
+  right?: ExtendedPositionValue
+  bottom?: ExtendedPositionValue
+  left?: ExtendedPositionValue
 }
+
+export type AnchorPositionValue = "anchor-top" | "anchor-bottom" | "anchor-left" | "anchor-right" | "anchor-center"
+export type PositionValue = number | "auto" | `${number}%`
+export type ExtendedPositionValue = PositionValue | AnchorPositionValue
+export type AlignSelfString = "anchor-center"
 
 export interface LayoutOptions {
   flexGrow?: number
@@ -45,10 +51,13 @@ export interface LayoutOptions {
   justifyContent?: JustifyString
   flexBasis?: number | "auto" | undefined
   position?: PositionTypeString
-  top?: number | "auto" | `${number}%`
-  right?: number | "auto" | `${number}%`
-  bottom?: number | "auto" | `${number}%`
-  left?: number | "auto" | `${number}%`
+  positionAnchor?: Renderable
+  top?: ExtendedPositionValue
+  right?: ExtendedPositionValue
+  bottom?: ExtendedPositionValue
+  left?: ExtendedPositionValue
+  justifySelf?: AlignSelfString
+  alignSelf?: AlignSelfString
   minWidth?: number
   minHeight?: number
   maxWidth?: number
@@ -127,11 +136,20 @@ export function isPaddingType(value: any): value is number | `${number}%` {
   return isValidPercentage(value)
 }
 
-export function isPositionType(value: any): value is number | "auto" | `${number}%` {
+export function isPositionType(value: any): value is PositionValue {
   if (typeof value === "number" && !Number.isNaN(value)) {
     return true
   }
   if (value === "auto") {
+    return true
+  }
+  if (
+    value === "anchor-top" ||
+    value === "anchor-bottom" ||
+    value === "anchor-left" ||
+    value === "anchor-right" ||
+    value === "anchor-center"
+  ) {
     return true
   }
   return isValidPercentage(value)
@@ -140,6 +158,31 @@ export function isPositionType(value: any): value is number | "auto" | `${number
 export function isPostionTypeType(value: any): value is PositionTypeString {
   return value === "relative" || value === "absolute"
 }
+
+const isYogaPositionValue = (
+  value: ExtendedPositionValue | undefined,
+): value is number | "auto" | `${number}%` | undefined => {
+  return (
+    value === undefined ||
+    value === "auto" ||
+    typeof value === "number" ||
+    (typeof value === "string" && value.endsWith("%"))
+  )
+}
+
+function applyPositionType(layoutNode: TrackedNode, edge: Edge, value?: ExtendedPositionValue) {
+  const node = layoutNode.yogaNode
+  if (isYogaPositionValue(value)) {
+    if (value === "auto") {
+      node.setPositionAuto(edge)
+    } else if (value !== undefined) {
+      node.setPosition(edge, value)
+    }
+  }
+}
+// else if (value) {
+//     node.setPosition(edge, 0)
+//   }
 
 export function isDimensionType(value: any): value is number | "auto" | `${number}%` {
   return isPositionType(value)
@@ -198,13 +241,17 @@ export abstract class Renderable extends EventEmitter {
   protected layoutNode: TrackedNode
   protected _positionType: PositionTypeString = "relative"
   protected _position: Position = {}
+  protected _justifySelf: AlignSelfString | undefined
+  protected _alignSelf: AlignSelfString | undefined
 
   private _childHostOverride: Renderable | null = null
 
   private renderableMap: Map<string, Renderable> = new Map()
   private renderableArray: Renderable[] = []
+  private anchoredRenderableArray: Renderable[] = []
   private needsZIndexSort: boolean = false
   public parent: Renderable | null = null
+  public anchor: Renderable | null = null
 
   constructor(ctx: RenderContext, options: RenderableOptions) {
     super()
@@ -234,6 +281,13 @@ export abstract class Renderable extends EventEmitter {
     this.layoutNode = createTrackedNode({ renderable: this } as any)
     this.layoutNode.yogaNode.setDisplay(this._visible ? Display.Flex : Display.None)
     this.setupYogaProperties(options)
+
+    // anchor properties
+    if (options.positionAnchor) {
+      this.anchor = options.positionAnchor
+    }
+    this._justifySelf = options.justifySelf
+    this._alignSelf = options.alignSelf
 
     this.applyEventOptions(options)
 
@@ -390,68 +444,128 @@ export abstract class Renderable extends EventEmitter {
   }
 
   public get x(): number {
-    if (this.parent && this._positionType === "relative") {
-      return this.parent.x + this._x
+    switch (this._positionType) {
+      case "absolute":
+        if (!this.anchor) {
+          return this._x
+        }
+        return this._x + this.getParentInsetCorrection().x + this.getAnchorPointX()
+      case "relative":
+        return this._x + this.getAnchorPointX()
+      case "static":
+        return this._x
+      default:
+        throw new Error("Invalid position type")
     }
-    return this._x
   }
 
   public set x(value: number) {
-    this.left = value
+    this._x = value
   }
 
-  public get top(): number | "auto" | `${number}%` | undefined {
+  public get y(): number {
+    switch (this._positionType) {
+      case "absolute":
+        if (!this.anchor) {
+          return this._y
+        }
+        return this._y + this.getParentInsetCorrection().y + this.getAnchorPointY()
+      case "relative":
+        return this._y + this.getAnchorPointY()
+      case "static":
+        return this._y
+      default:
+        throw new Error("Invalid position type")
+    }
+  }
+
+  public set y(value: number) {
+    this._y = value
+  }
+
+  public get top(): ExtendedPositionValue | undefined {
     return this._position.top
   }
 
-  public set top(value: number | "auto" | `${number}%` | undefined) {
+  public set top(value: ExtendedPositionValue | undefined) {
     if (isPositionType(value) || value === undefined) {
       this.setPosition({ top: value })
     }
   }
 
-  public get right(): number | "auto" | `${number}%` | undefined {
+  public get right(): ExtendedPositionValue | undefined {
     return this._position.right
   }
 
-  public set right(value: number | "auto" | `${number}%` | undefined) {
+  public set right(value: ExtendedPositionValue | undefined) {
     if (isPositionType(value) || value === undefined) {
       this.setPosition({ right: value })
     }
   }
 
-  public get bottom(): number | "auto" | `${number}%` | undefined {
+  public get bottom(): ExtendedPositionValue | undefined {
     return this._position.bottom
   }
 
-  public set bottom(value: number | "auto" | `${number}%` | undefined) {
+  public set bottom(value: ExtendedPositionValue | undefined) {
     if (isPositionType(value) || value === undefined) {
       this.setPosition({ bottom: value })
     }
   }
 
-  public get left(): number | "auto" | `${number}%` | undefined {
+  public get left(): ExtendedPositionValue | undefined {
     return this._position.left
   }
 
-  public set left(value: number | "auto" | `${number}%` | undefined) {
+  public set left(value: ExtendedPositionValue | undefined) {
     if (isPositionType(value) || value === undefined) {
       this.setPosition({ left: value })
     }
   }
 
-  public get y(): number {
-    if (this.parent && this._positionType === "relative") {
-      return this.parent.y + this._y
-    }
-    return this._y
+  public get positionAnchor(): Renderable | null {
+    return this.anchor
   }
 
-  public set y(value: number) {
-    this.top = value
+  public set positionAnchor(anchor: Renderable | null) {
+    if (anchor !== this.anchor) {
+      if (this.anchor) this.anchor.detach(this)
+
+      if (anchor) {
+        anchor.attach(this)
+        this._positionType = "absolute"
+        this.layoutNode.yogaNode.setPositionType(PositionType.Absolute)
+      }
+      this.needsUpdate()
+    }
+  }
+
+  public get justifySelf(): AlignSelfString | undefined {
+    return this._justifySelf
+  }
+
+  public set justifySelf(value: AlignSelfString | undefined) {
+    if (this._justifySelf !== value) {
+      this._justifySelf = value
+      this.needsUpdate()
+    }
+  }
+
+  public get alignSelf(): AlignSelfString | undefined {
+    return this._alignSelf
+  }
+
+  public set alignSelf(value: AlignSelfString | undefined) {
+    if (this._alignSelf !== value) {
+      this._alignSelf = value
+      this.needsUpdate()
+    }
   }
 
   public get width(): number {
+    if (this.anchor && this.left === "anchor-left" && this.right === "anchor-right") {
+      return this.anchor.width
+    }
     return this._widthValue
   }
 
@@ -476,12 +590,20 @@ export abstract class Renderable extends EventEmitter {
   }
 
   public get zIndex(): number {
+    if (this.anchoredRenderableArray.filter((x) => x.visible).length > 0) {
+      return Number.POSITIVE_INFINITY
+    }
     return this._zIndex
   }
 
   public set zIndex(value: number) {
     if (this._zIndex !== value) {
       this._zIndex = value
+
+      if (this.anchor) {
+        this.anchor.requestZIndexSort()
+        return
+      }
       this.parent?.requestZIndexSort()
     }
   }
@@ -497,6 +619,14 @@ export abstract class Renderable extends EventEmitter {
   private ensureZIndexSorted(): void {
     if (this.needsZIndexSort) {
       this.renderableArray.sort((a, b) => (a.zIndex > b.zIndex ? 1 : a.zIndex < b.zIndex ? -1 : 0))
+      if (this.id === "box-8") {
+        console.log(
+          "sort",
+          this.id,
+          this.renderableArray.map((x) => `${x.id} ${x.zIndex} ${x.anchoredRenderableArray[0]?.visible}`),
+        )
+      }
+      this.anchoredRenderableArray.sort((a, b) => (a.zIndex > b.zIndex ? 1 : a.zIndex < b.zIndex ? -1 : 0))
       this.needsZIndexSort = false
     }
   }
@@ -636,37 +766,13 @@ export abstract class Renderable extends EventEmitter {
   }
 
   private updateYogaPosition(position: Position): void {
-    const node = this.layoutNode.yogaNode
     const { top, right, bottom, left } = position
 
-    if (isPositionType(top)) {
-      if (top === "auto") {
-        node.setPositionAuto(Edge.Top)
-      } else {
-        node.setPosition(Edge.Top, top)
-      }
-    }
-    if (isPositionType(right)) {
-      if (right === "auto") {
-        node.setPositionAuto(Edge.Right)
-      } else {
-        node.setPosition(Edge.Right, right)
-      }
-    }
-    if (isPositionType(bottom)) {
-      if (bottom === "auto") {
-        node.setPositionAuto(Edge.Bottom)
-      } else {
-        node.setPosition(Edge.Bottom, bottom)
-      }
-    }
-    if (isPositionType(left)) {
-      if (left === "auto") {
-        node.setPositionAuto(Edge.Left)
-      } else {
-        node.setPosition(Edge.Left, left)
-      }
-    }
+    applyPositionType(this.layoutNode, Edge.Top, top)
+    applyPositionType(this.layoutNode, Edge.Right, right)
+    applyPositionType(this.layoutNode, Edge.Bottom, bottom)
+    applyPositionType(this.layoutNode, Edge.Left, left)
+
     this.needsUpdate()
   }
 
@@ -830,6 +936,99 @@ export abstract class Renderable extends EventEmitter {
     }
   }
 
+  protected getParentInsetCorrection(): { x: number; y: number } {
+    let correctionX = 0
+    let correctionY = 0
+
+    if (this.parent && this.anchor) {
+      correctionX -=
+        this.parent.getLayoutNode().yogaNode.getComputedPadding(Edge.Left) +
+        this.parent.getLayoutNode().yogaNode.getComputedMargin(Edge.Left) +
+        this.parent.getLayoutNode().yogaNode.getComputedBorder(Edge.Left)
+      correctionY -=
+        this.parent.getLayoutNode().yogaNode.getComputedPadding(Edge.Top) +
+        this.parent.getLayoutNode().yogaNode.getComputedMargin(Edge.Top) +
+        this.parent.getLayoutNode().yogaNode.getComputedBorder(Edge.Top)
+    }
+
+    return { x: correctionX, y: correctionY }
+  }
+
+  protected getAnchorPointX(): number {
+    let finalX = 0
+    const anchor = this.anchor
+
+    if (anchor) {
+      const width = this.width
+      const anchorX = anchor.x
+      const anchorWidth = anchor.width
+
+      // default to anchor position left: anchor-left
+      finalX = anchorX
+
+      // Handle anchor position values
+      if (this._position.left === "anchor-right") {
+        finalX += anchorWidth
+      } else if (this._position.left === "anchor-center") {
+        finalX += Math.round(anchorWidth / 2)
+      }
+
+      if (this._position.right === "anchor-left") {
+        finalX -= this._widthValue
+      } else if (this._position.right === "anchor-right") {
+        finalX += anchorWidth - width
+      } else if (this._position.right === "anchor-center") {
+        finalX += Math.round(anchorWidth / 2) - width
+      }
+
+      if (this._justifySelf === "anchor-center") {
+        finalX = anchorX + Math.round((anchorWidth - width) / 2)
+      }
+    } else if (this._positionType === "relative" && this.parent) {
+      finalX = this.parent.x
+    }
+
+    return finalX
+  }
+
+  protected getAnchorPointY(): number {
+    let finalY = 0
+    const anchor = this.anchor
+
+    if (anchor) {
+      const height = this.height
+      const anchorY = anchor.y
+      const anchorHeight = anchor.height
+
+      // default to anchor position top: anchor-top
+      finalY = anchorY
+
+      // Handle anchor position values
+      if (this._position.top === "anchor-bottom") {
+        finalY += anchorHeight
+      } else if (this._position.top === "anchor-center") {
+        finalY += Math.round(anchorHeight / 2)
+      }
+
+      if (this._position.bottom === "anchor-top") {
+        finalY = anchorY - height
+      } else if (this._position.bottom === "anchor-bottom") {
+        finalY += anchorHeight - height
+      } else if (this._position.bottom === "anchor-center") {
+        finalY += Math.round(anchorHeight / 2) - height
+      }
+
+      // Handle anchor-center alignment
+      if (this._alignSelf === "anchor-center") {
+        finalY += Math.round((anchorHeight - height) / 2)
+      }
+    } else if (this._positionType === "relative" && this.parent) {
+      finalY = this.parent.y
+    }
+
+    return finalY
+  }
+
   protected onLayoutResize(width: number, height: number): void {
     if (this._visible) {
       this.handleFrameBufferResize(width, height)
@@ -878,6 +1077,31 @@ export abstract class Renderable extends EventEmitter {
       obj.parent.remove(obj.id)
     }
     obj.parent = this
+  }
+
+  public attach(obj: Renderable): void {
+    const existing = this.anchoredRenderableArray.indexOf(obj)
+    if (existing !== -1) {
+      this.anchoredRenderableArray.splice(existing, 1)
+    }
+
+    if (obj.anchor) {
+      obj.anchor.detach(obj)
+    }
+    obj.anchor = this
+    this.anchoredRenderableArray.push(obj)
+    this.needsZIndexSort = true
+
+    this.needsUpdate()
+  }
+
+  public detach(obj: Renderable): void {
+    const existing = this.anchoredRenderableArray.indexOf(obj)
+    if (existing !== -1) {
+      this.anchoredRenderableArray.splice(existing, 1)
+      obj.anchor = null
+      this.needsUpdate()
+    }
   }
 
   public add(obj: Renderable, index?: number): number {
@@ -981,8 +1205,13 @@ export abstract class Renderable extends EventEmitter {
     return [...this.renderableArray]
   }
 
-  public render(buffer: OptimizedBuffer, deltaTime: number): void {
+  public render(buffer: OptimizedBuffer, deltaTime: number, resumed?: boolean): void {
     if (!this.visible) return
+
+    // Hold off rendering until the anchor is ready
+    if (this.anchor && !resumed) {
+      return
+    }
 
     this.beforeRender()
     this.updateFromLayout()
@@ -999,6 +1228,10 @@ export abstract class Renderable extends EventEmitter {
 
     for (const child of this.renderableArray) {
       child.render(renderBuffer, deltaTime)
+    }
+
+    for (const anchoredChild of this.anchoredRenderableArray) {
+      anchoredChild.render(renderBuffer, deltaTime, true)
     }
 
     if (this.buffered && this.frameBuffer) {
@@ -1021,6 +1254,10 @@ export abstract class Renderable extends EventEmitter {
       this.parent.remove(this.id)
     }
 
+    if (this.anchor) {
+      this.anchor.detach(this)
+    }
+
     if (this.frameBuffer) {
       this.frameBuffer.destroy()
       this.frameBuffer = null
@@ -1029,6 +1266,10 @@ export abstract class Renderable extends EventEmitter {
     for (const child of this.renderableArray) {
       child.parent = null
       child.destroy()
+    }
+
+    for (const child of this.anchoredRenderableArray) {
+      child.anchor = null
     }
 
     this.renderableArray = []
@@ -1132,6 +1373,19 @@ export abstract class Renderable extends EventEmitter {
     if (options.onMouseOut) this.onMouseOut = options.onMouseOut
     if (options.onMouseScroll) this.onMouseScroll = options.onMouseScroll
     if (options.onKeyDown) this.onKeyDown = options.onKeyDown
+  }
+}
+
+export class FloatRootRenderable extends Renderable {
+  constructor(ctx: RenderContext) {
+    super(ctx, {
+      id: "__float_root__",
+      zIndex: 0,
+      visible: true,
+      width: ctx.width,
+      height: ctx.height,
+      enableLayout: true,
+    })
   }
 }
 

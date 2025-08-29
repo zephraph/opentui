@@ -7,6 +7,7 @@ import MouseScene from "./mouse-demo.tsx"
 import TextStyleScene from "./text-style-demo.tsx"
 import TextSelectionDemo from "./text-selection-demo.tsx"
 import TabSelectDemo from "./tab-select-demo.tsx"
+import AnchorDemo from "./anchor-demo.tsx"
 
 const EXAMPLES = [
   {
@@ -38,6 +39,11 @@ const EXAMPLES = [
     name: "Tab Select Demo",
     description: "Tab selection demo",
     scene: "tab-select-demo",
+  },
+  {
+    name: "Anchor Demo",
+    description: "Click boxes to spawn anchored boxes that follow their targets using the anchor API",
+    scene: "anchor-demo",
   },
 ]
 
@@ -108,6 +114,9 @@ const ExampleSelector = () => {
       </Match>
       <Match when={selectedScene() === "tab-select-demo"}>
         <TabSelectDemo />
+      </Match>
+      <Match when={selectedScene() === "anchor-demo"}>
+        <AnchorDemo />
       </Match>
       <Match when={selected() === -1}>
         <box style={{ height: terminalDimensions().height, backgroundColor: "#001122", padding: 1 }}>

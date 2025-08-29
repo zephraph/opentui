@@ -75,7 +75,7 @@ export function hexToRgb(hex: string): RGBA {
     hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2]
   }
 
-  if (!/^[0-9A-Fa-f]{6}$/.test(hex)) {
+  if (!/^[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(hex)) {
     console.warn(`Invalid hex color: ${hex}, defaulting to magenta`)
     return RGBA.fromValues(1, 0, 1, 1)
   }
@@ -84,7 +84,12 @@ export function hexToRgb(hex: string): RGBA {
   const g = parseInt(hex.substring(2, 4), 16) / 255
   const b = parseInt(hex.substring(4, 6), 16) / 255
 
-  return RGBA.fromValues(r, g, b, 1)
+  let a = 1
+  if (hex.length === 8) {
+    a = parseInt(hex.substring(6, 8), 16) / 255
+  }
+
+  return RGBA.fromValues(r, g, b, a)
 }
 
 export function rgbToHex(rgb: RGBA): string {

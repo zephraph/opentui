@@ -21,6 +21,8 @@ export const render = async (node: () => JSX.Element, renderConfig: CliRendererC
       }),
     renderer.root,
   )
+
+  return renderer;
 }
 
 export { type JSX }
