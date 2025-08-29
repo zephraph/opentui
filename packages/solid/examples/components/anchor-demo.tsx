@@ -36,13 +36,13 @@ export default function AnchorDemo() {
   })
 
   return (
-    <group width={td().width} height={td().height}>
+    <box width={td().width} height={td().height}>
       <box justifyContent="center" width="100%" height={4} alignItems="center" backgroundColor="#001122">
         <ascii_font text="Anchor Demo" font="tiny" />
       </box>
       <box flexDirection="row" width="100%" flexGrow={1} backgroundColor="#123123">
         <box border title="Test area ( hover on a target to see )" flexGrow={1}>
-          <group alignItems="center" justifyContent="space-evenly" flexDirection="row" flexGrow={1}>
+          <box alignItems="center" justifyContent="space-evenly" flexDirection="row" flexGrow={1}>
             <box
               ref={setAnchor}
               title="target-1"
@@ -55,8 +55,8 @@ export default function AnchorDemo() {
               style={{ width: 20, height: 10, marginRight: 2, marginTop: 3, backgroundColor: "#004400" }}
               border
             />
-          </group>
-          <group alignItems="center" justifyContent="space-evenly" flexDirection="row" flexGrow={1}>
+          </box>
+          <box alignItems="center" justifyContent="space-evenly" flexDirection="row" flexGrow={1}>
             <box
               ref={setAnchor}
               title="target-1"
@@ -69,7 +69,7 @@ export default function AnchorDemo() {
               style={{ width: 20, height: 10, marginRight: 5, marginTop: -2, backgroundColor: "#004400" }}
               border
             />
-          </group>
+          </box>
         </box>
         <box title="Anchor config" minWidth={40} border onMouseDown={(e) => setFocusedDropdown(-1)}>
           {bold("Position")}
@@ -139,7 +139,7 @@ export default function AnchorDemo() {
           />
         </box>
       </box>
-    </group>
+    </box>
   )
 }
 
@@ -218,7 +218,7 @@ function Dropdown(props: {
 
 function AbsoluteTest() {
   return (
-    <group flexDirection="row" height="100%" width="100%">
+    <box flexDirection="row" height="100%" width="100%">
       <box
         style={{
           minWidth: 1,
@@ -249,7 +249,7 @@ function AbsoluteTest() {
         ></box>
       </box>
       <box flexGrow={1} flexDirection="row" backgroundColor="#001122" height="100%" />
-    </group>
+    </box>
   )
 }
 

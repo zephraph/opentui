@@ -1,4 +1,5 @@
-import { CliRenderer, BoxRenderable, TextRenderable, type MouseEvent } from "../index"
+import { CliRenderer, BoxRenderable, TextRenderable, type MouseEvent, createCliRenderer } from "../index"
+import { setupCommonDemoKeys } from "./lib/standalone-keys"
 
 let renderer: CliRenderer | null = null
 let anchorBoxes: BoxRenderable[] = []
@@ -12,7 +13,8 @@ export function run(r: CliRenderer): void {
   const width = renderer.terminalWidth
   const height = renderer.terminalHeight
 
-  instructionsText = new TextRenderable("instructions-anchor", {
+  instructionsText = new TextRenderable(renderer, {
+    id: "instructions-anchor",
     position: "absolute",
     left: 2,
     top: 1,
@@ -38,7 +40,8 @@ function createRandomBoxes(width: number, height: number): void {
     const x = Math.floor(Math.random() * (width - boxWidth - 4)) + 2
     const y = Math.floor(Math.random() * (height - boxHeight - 8)) + 6
 
-    const box = new BoxRenderable(`anchor-box-${i}`, {
+    const box = new BoxRenderable(renderer!, {
+      id: `anchor-box-${i}`,
       position: "absolute",
       left: x,
       top: y,
@@ -70,7 +73,8 @@ function attachBoxToTarget(targetBox: BoxRenderable): void {
   const colors = ["#FF1744", "#E91E63", "#9C27B0"]
 
   console.log("attaching box to target", targetBox.id)
-  const attachedBox = new BoxRenderable(`attached-box-${attachedIndex}`, {
+  const attachedBox = new BoxRenderable(targetBox.ctx, {
+    id: `attached-box-${attachedIndex}`,
     position: "absolute",
     positionAnchor: targetBox,
     width: 8,
@@ -147,4 +151,14 @@ export function destroy(r: CliRenderer): void {
   attachedBoxes = []
   instructionsText = null
   renderer = null
+}
+
+if (import.meta.main) {
+  const renderer = await createCliRenderer({
+    targetFps: 30,
+    enableMouseMovement: true,
+    exitOnCtrlC: true,
+  })
+  run(renderer)
+  setupCommonDemoKeys(renderer)
 }
