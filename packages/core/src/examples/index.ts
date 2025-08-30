@@ -45,6 +45,7 @@ import * as vnodeCompositionDemo from "./vnode-composition-demo"
 import * as hastSyntaxHighlightingExample from "./hast-syntax-highlighting-demo"
 import * as liveStateExample from "./live-state-demo"
 import * as fullUnicodeExample from "./full-unicode-demo"
+import * as scrollAreaExample from "./scroll-area"
 import { getKeyHandler } from "../lib/KeyHandler"
 import { setupCommonDemoKeys } from "./lib/standalone-keys"
 
@@ -56,6 +57,12 @@ interface Example {
 }
 
 const examples: Example[] = [
+  {
+    name: "Scroll Area Demo",
+    description: "",
+    run: scrollAreaExample.run,
+    destroy: scrollAreaExample.destroy,
+  },
   {
     name: "Mouse Interaction Demo",
     description: "Interactive mouse trails and clickable cells demonstration",
