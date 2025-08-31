@@ -72,7 +72,7 @@ export class ScrollBarRenderable extends Renderable {
 
   public set thumbPos(pos: number) {
     this._thumbPos = pos
-    this.needsUpdate()
+    this.requestRender()
   }
 
   public get thumbSize() {
@@ -81,7 +81,7 @@ export class ScrollBarRenderable extends Renderable {
 
   public set thumbSize(size: number) {
     this._thumbSize = size
-    this.needsUpdate()
+    this.requestRender()
   }
 
   public get contentSize() {
@@ -90,7 +90,7 @@ export class ScrollBarRenderable extends Renderable {
 
   public set contentSize(size: Size) {
     this._contentSize = size
-    this.needsUpdate()
+    this.requestRender()
   }
 
   public get viewportSize() {
@@ -99,7 +99,7 @@ export class ScrollBarRenderable extends Renderable {
 
   public set viewportSize(size: Size) {
     this._viewportSize = size
-    this.needsUpdate()
+    this.requestRender()
   }
 
   protected onMouseEvent(event: MouseEvent): void {}
@@ -230,7 +230,7 @@ export class ScrollAreaRenderable extends Renderable {
   }
 
   protected onResize(): void {
-    this.needsUpdate()
+    this.requestRender()
   }
 
   public onKeyPress(key: ParsedKey | string): boolean {
