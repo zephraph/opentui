@@ -1096,6 +1096,7 @@ export abstract class Renderable extends BaseRenderable {
     obj.parent = this
   }
 
+  private _newChildren: Renderable[] = []
   public add(obj: Renderable | VNode<any, any[]> | unknown, index?: number): number {
     if (!obj) {
       return -1
@@ -1132,6 +1133,7 @@ export abstract class Renderable extends BaseRenderable {
     this.needsZIndexSort = true
     this.childrenPrimarySortDirty = true
     this.renderableMap.set(renderable.id, renderable)
+    this._newChildren.push(renderable)
 
     if (renderable._liveCount > 0) {
       this.propagateLiveCount(renderable._liveCount)
@@ -1220,12 +1222,44 @@ export abstract class Renderable extends BaseRenderable {
     return this.renderableArray.length
   }
 
-  public render(buffer: OptimizedBuffer, deltaTime: number): void {
+  public updateLayout(deltaTime: number, renderList: RenderCommand[] = []): void {
     if (!this.visible) return
 
-    this.onUpdate(deltaTime)
     this.updateFromLayout()
+    this.onUpdate(deltaTime)
+    renderList.push({ action: "render", renderable: this })
 
+    if (this._newChildren.length > 0) {
+      for (const child of this._newChildren) {
+        child.updateFromLayout()
+      }
+      this._newChildren = []
+    }
+
+    this.ensureZIndexSorted()
+
+    const shouldPushScissor = this._overflow !== "visible" && this.width > 0 && this.height > 0
+    if (shouldPushScissor) {
+      const scissorRect = this.getScissorRect()
+      renderList.push({
+        action: "pushScissorRect",
+        x: scissorRect.x,
+        y: scissorRect.y,
+        width: scissorRect.width,
+        height: scissorRect.height,
+      })
+    }
+
+    for (const child of this._getChildren()) {
+      child.updateLayout(deltaTime, renderList)
+    }
+
+    if (shouldPushScissor) {
+      renderList.push({ action: "popScissorRect" })
+    }
+  }
+
+  public render(buffer: OptimizedBuffer, deltaTime: number): void {
     let renderBuffer = buffer
     if (this.buffered && this.frameBuffer) {
       renderBuffer = this.frameBuffer
@@ -1243,21 +1277,6 @@ export abstract class Renderable extends BaseRenderable {
 
     this.markClean()
     this._ctx.addToHitGrid(this.x, this.y, this.width, this.height, this.num)
-    this.ensureZIndexSorted()
-
-    const shouldPushScissor = this._overflow !== "visible" && this.width > 0 && this.height > 0
-    if (shouldPushScissor) {
-      const scissorRect = this.getScissorRect()
-      renderBuffer.pushScissorRect(scissorRect.x, scissorRect.y, scissorRect.width, scissorRect.height)
-    }
-
-    for (const child of this._getChildren()) {
-      child.render(renderBuffer, deltaTime)
-    }
-
-    if (shouldPushScissor) {
-      renderBuffer.popScissorRect()
-    }
 
     if (this.buffered && this.frameBuffer) {
       buffer.drawFrameBuffer(this.x, this.y, this.frameBuffer)
@@ -1431,8 +1450,32 @@ export abstract class Renderable extends BaseRenderable {
   }
 }
 
+interface RenderCommandBase {
+  action: "render" | "pushScissorRect" | "popScissorRect"
+}
+
+interface RenderCommandPushScissorRect extends RenderCommandBase {
+  action: "pushScissorRect"
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+interface RenderCommandPopScissorRect extends RenderCommandBase {
+  action: "popScissorRect"
+}
+
+interface RenderCommandRender extends RenderCommandBase {
+  action: "render"
+  renderable: Renderable
+}
+
+export type RenderCommand = RenderCommandPushScissorRect | RenderCommandPopScissorRect | RenderCommandRender
+
 export class RootRenderable extends Renderable {
   private yogaConfig: Config
+  private renderList: RenderCommand[] = []
 
   constructor(ctx: RenderContext) {
     super(ctx, { id: "__root__", zIndex: 0, visible: true, width: ctx.width, height: ctx.height, enableLayout: true })
@@ -1451,6 +1494,36 @@ export class RootRenderable extends Renderable {
     this.layoutNode.yogaNode.setFlexDirection(FlexDirection.Column)
 
     this.calculateLayout()
+  }
+
+  public render(buffer: OptimizedBuffer, deltaTime: number): void {
+    if (!this.visible) return
+
+    // Two-step rendering process:
+    // 1. Calculate layout from root
+    if (this.layoutNode.yogaNode.isDirty()) {
+      this.calculateLayout()
+    }
+
+    // 2. Update layout throughout the tree and collect render list
+    this.renderList.length = 0
+    this.updateLayout(deltaTime, this.renderList)
+
+    // 3. Render all collected renderables
+    for (let i = 1; i < this.renderList.length; i++) {
+      const command = this.renderList[i]
+      switch (command.action) {
+        case "render":
+          command.renderable.render(buffer, deltaTime)
+          break
+        case "pushScissorRect":
+          buffer.pushScissorRect(command.x, command.y, command.width, command.height)
+          break
+        case "popScissorRect":
+          buffer.popScissorRect()
+          break
+      }
+    }
   }
 
   protected propagateLiveCount(delta: number): void {
@@ -1476,10 +1549,9 @@ export class RootRenderable extends Renderable {
     this.emit(LayoutEvents.RESIZED, { width, height })
   }
 
-  protected onUpdate(): void {
-    if (this.layoutNode.yogaNode.isDirty()) {
-      this.calculateLayout()
-    }
+  protected onUpdate(deltaTime: number): void {
+    // Layout calculation is now handled in render() method
+    // This method can be used for other update logic if needed
   }
 
   protected destroySelf(): void {
