@@ -1501,15 +1501,20 @@ export class RootRenderable extends Renderable {
 
     // Two-step rendering process:
     // 1. Calculate layout from root
+    const startLayout = performance.now()
     if (this.layoutNode.yogaNode.isDirty()) {
       this.calculateLayout()
     }
+    const endLayout = performance.now()
 
     // 2. Update layout throughout the tree and collect render list
+    const startRender = performance.now()
     this.renderList.length = 0
     this.updateLayout(deltaTime, this.renderList)
+    const endRender = performance.now()
 
     // 3. Render all collected renderables
+    const startRenderList = performance.now()
     for (let i = 1; i < this.renderList.length; i++) {
       const command = this.renderList[i]
       switch (command.action) {
@@ -1524,6 +1529,16 @@ export class RootRenderable extends Renderable {
           break
       }
     }
+    const endRenderList = performance.now()
+
+    console.log(
+      "Layout:",
+      endLayout - startLayout,
+      "Render:",
+      endRender - startRender,
+      "RenderList:",
+      endRenderList - startRenderList,
+    )
   }
 
   protected propagateLiveCount(delta: number): void {
