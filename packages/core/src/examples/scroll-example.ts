@@ -19,7 +19,7 @@ let scrollBox: ScrollBoxRenderable | null = null
 let renderer: CliRenderer | null = null
 let mainContainer: BoxRenderable | null = null
 let instructionsBox: BoxRenderable | null = null
-let nextIndex = 1000
+let nextIndex = 10000
 
 function addBox(i: number) {
   if (!renderer || !scrollBox) return
@@ -167,7 +167,7 @@ export function run(rendererInstance: CliRenderer): void {
   // Add an ASCII renderable at the top (index 0) for immediate visibility
   addAsciiRenderable(0)
 
-  for (let index = 1; index < 1000; index++) {
+  for (let index = 1; index < nextIndex; index++) {
     if ((index + 1) % 100 === 0) {
       addAsciiRenderable(index)
     } else {
@@ -217,7 +217,6 @@ if (import.meta.main) {
       console.log(`Horizontal scrollbar ${!currentState ? "shown" : "hidden"}`)
     } else if (key.name === "n" && scrollBox) {
       addBox(nextIndex)
-      console.log(`Added new child at index ${nextIndex}`)
       nextIndex++
     }
   })
