@@ -251,6 +251,11 @@ export class TextRenderable extends Renderable {
   }
 
   insertChunk(chunk: TextChunk, index?: number): void {
+    if (typeof index === "number") {
+      this._text.chunks.splice(index, 0, chunk)
+    } else {
+      this._text.chunks.push(chunk)
+    }
     this.textBuffer.insertEncodedChunkGroup(
       index ?? this.textBuffer.chunkGroupCount,
       chunk.text,
@@ -265,6 +270,7 @@ export class TextRenderable extends Renderable {
   removeChunk(chunk: TextChunk): void {
     const index = this._text.chunks.indexOf(chunk)
     if (index === -1) return
+    this._text.chunks.splice(index, 1)
     this.textBuffer.removeChunkGroup(index)
     this.updateTextInfo()
     this.clearChunks(this._text)
@@ -274,6 +280,7 @@ export class TextRenderable extends Renderable {
     const index = this._text.chunks.indexOf(oldChunk)
 
     if (index === -1) return
+    this._text.chunks[index] = chunk
     this.textBuffer.replaceEncodedChunkGroup(index, chunk.text, chunk.fg, chunk.bg, chunk.attributes)
     this.updateTextInfo()
     this.clearChunks(this._text)

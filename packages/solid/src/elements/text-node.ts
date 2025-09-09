@@ -36,7 +36,8 @@ export class TextNode {
       log("No parent found for text node:", this.id)
       return
     }
-    textParent.content = textParent.content.replace(newChunk, this.chunk)
+    textParent.replaceChunk(newChunk, this.chunk)
+    ChunkToTextNodeMap.delete(this.chunk)
     this.chunk = newChunk
     ChunkToTextNodeMap.set(newChunk, this)
   }
@@ -69,31 +70,32 @@ export class TextNode {
     }
 
     this.textParent = textParent
-    let styledText = textParent.content
 
     if (anchor) {
+      let anchorIndex = -1
       if (anchor instanceof Renderable) {
         console.warn("text node can't be anchored to Renderable")
         return
       } else if (isTextChunk(anchor)) {
-        anchor = ChunkToTextNodeMap.get(anchor)
-      }
-      const anchorIndex = anchor ? styledText.chunks.indexOf(anchor.chunk) : -1
-      if (anchorIndex === -1) {
-        log("anchor not found")
-        styledText = styledText.insert(this.chunk)
+        anchorIndex = textParent.chunks.indexOf(anchor)
       } else {
-        styledText = styledText.insert(this.chunk, anchorIndex)
+        anchorIndex = textParent.chunks.indexOf(anchor.chunk)
       }
+      log("anchor", anchorIndex)
+      if (anchorIndex === -1) {
+        log("anchor not found, this is probably a mistake")
+        textParent.insertChunk(this.chunk)
+      }
+      textParent.insertChunk(this.chunk, anchorIndex)
     } else {
       const firstChunk = textParent.content.chunks[0]
       if (firstChunk && !ChunkToTextNodeMap.has(firstChunk)) {
-        styledText = styledText.replace(this.chunk, firstChunk)
+        textParent.replaceChunk(this.chunk, firstChunk)
       } else {
-        styledText = styledText.insert(this.chunk)
+        textParent.insertChunk(this.chunk)
       }
     }
-    textParent.content = styledText
+
     // Solid creates empty text nodes to cleanup a child array. This
     // handles such cases.
     textParent.visible = textParent.textLength !== 0
@@ -111,17 +113,14 @@ export class TextNode {
     }
     if (parent === this.textParent && parent instanceof TextRenderable) {
       ChunkToTextNodeMap.delete(this.chunk)
-      parent.content = parent.content.remove(this.chunk)
+      parent.removeChunk(this.chunk)
       return
     }
     if (this.textParent) {
       ChunkToTextNodeMap.delete(this.chunk)
-      let styledText = this.textParent.content
-      styledText = styledText.remove(this.chunk)
+      this.textParent.removeChunk(this.chunk)
 
-      if (styledText.chunks.length > 0) {
-        this.textParent.content = styledText
-      } else {
+      if (this.textParent.chunks.length === 0) {
         this.parent?.remove(this.textParent.id)
         process.nextTick(() => {
           if (!this.textParent) return

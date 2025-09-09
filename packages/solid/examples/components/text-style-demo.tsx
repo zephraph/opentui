@@ -9,7 +9,7 @@ export default function TextStyleScene() {
   onMount(() => {
     interval = setInterval(() => {
       setCounter((c) => c + 1)
-    }, 1000)
+    }, 10000)
   })
 
   onCleanup(() => {
