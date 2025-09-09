@@ -1,25 +1,6 @@
-import { createSignal, For, Match, onMount, Switch } from "solid-js"
-import { EventEmitter } from "events"
-import { render, useKeyboard, useRenderer } from "@opentui/solid"
 import { ConsolePosition } from "@opentui/core/src/console"
-
-const Tab = (props: { title: string; active: boolean; index: number }) => {
-  return (
-    <box
-      style={{
-        height: 3,
-        paddingTop: 1,
-        border: props.active && ["bottom"],
-        marginLeft: props.index === 0 ? 0 : 1,
-        flexGrow: 1,
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <text>{props.title}</text>
-    </box>
-  )
-}
+import { render, useRenderer } from "@opentui/solid"
+import { createSignal, Match, onMount, Switch } from "solid-js"
 
 const tabs = [
   { title: "Text & Attributes" },
@@ -38,8 +19,6 @@ export default function TabSelectDemo() {
     renderer.useConsole = true
     renderer.console.show()
   })
-
-  useKeyboard((key) => {})
 
   return (
     <box style={{ flexDirection: "column", flexGrow: 1 }}>
@@ -63,6 +42,26 @@ export default function TabSelectDemo() {
         </Match>
         <Match when={activeTab() === 1}>
           <text>Tab 2/6 - Use Left/Right arrows to navigate | Press Ctrl+C to exit | D: toggle debug</text>
+        </Match>
+        <Match when={activeTab() === 2}>
+          <text>Tab 3/6 - Use Left/Right arrows to navigate | Press Ctrl+C to exit | D: toggle debug</text>
+          <input
+            focused
+            placeholder="tab 3 input"
+            onSubmit={(value) => {
+              console.log("tab 3", value)
+            }}
+          />
+        </Match>
+        <Match when={activeTab() === 3}>
+          <text>Tab 4/6 - Use Left/Right arrows to navigate | Press Ctrl+C to exit | D: toggle debug</text>
+          <input
+            focused
+            placeholder="tab 4 input"
+            onSubmit={(value) => {
+              console.log("tab 4", value)
+            }}
+          />
         </Match>
       </Switch>
     </box>
