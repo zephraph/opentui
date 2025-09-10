@@ -273,6 +273,7 @@ export abstract class Renderable extends BaseRenderable {
 
   private childrenPrimarySortDirty: boolean = true
   private childrenSortedByPrimaryAxis: Renderable[] = []
+  private _newChildren: Renderable[] = []
 
   public renderBefore?: (this: Renderable, buffer: OptimizedBuffer, deltaTime: number) => void
   public renderAfter?: (this: Renderable, buffer: OptimizedBuffer, deltaTime: number) => void
@@ -1096,7 +1097,6 @@ export abstract class Renderable extends BaseRenderable {
     obj.parent = this
   }
 
-  private _newChildren: Renderable[] = []
   public add(obj: Renderable | VNode<any, any[]> | unknown, index?: number): number {
     if (!obj) {
       return -1
