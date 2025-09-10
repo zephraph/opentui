@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, onMount, onCleanup, type Component } from "solid-js"
+import { createMemo, createSignal, For, onMount } from "solid-js"
 import { ScrollBoxRenderable, fg } from "@opentui/core"
 
 // Message types
@@ -98,12 +98,7 @@ export function Session() {
   }
 
   onMount(() => {
-    // Add initial message
     setTimeout(addMessage, 500)
-  })
-
-  onCleanup(() => {
-    // Cleanup will be handled by the chunking intervals
   })
 
   return (
