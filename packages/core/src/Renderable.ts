@@ -1143,10 +1143,21 @@ export abstract class Renderable extends BaseRenderable {
   public updateLayout(deltaTime: number, renderList: RenderCommand[] = []): void {
     if (!this.visible) return
 
+    // NOTE: worst case updateFromLayout is called throughout the whole tree,
+    // which currently still has yoga performance issues.
+    // This can be mitigated at some point when the layout tree moved to native,
+    // as in the native yoga tree we can use events during the calculateLayout phase,
+    // and anctually know if a child has changed or not.
+    // That would allow us to to generate optimised render commands,
+    // including the layout updates, in one pass.
     this.updateFromLayout()
+
     this.onUpdate(deltaTime)
     renderList.push({ action: "render", renderable: this })
 
+    // Note: This will update newly added children, but not their children.
+    // It is meant to make sure children update the layout, even though they may not be in the viewport
+    // and filtered out for updates like for the ScrollBox for example.
     if (this._newChildren.length > 0) {
       for (const child of this._newChildren) {
         child.updateFromLayout()
@@ -1417,22 +1428,23 @@ export class RootRenderable extends Renderable {
   public render(buffer: OptimizedBuffer, deltaTime: number): void {
     if (!this.visible) return
 
-    // Two-step rendering process:
+    // NOTE: Strictly speaking, this is a 3-pass rendering process:
     // 1. Calculate layout from root
-    const startLayout = performance.now()
+    // 2. Update layout throughout the tree and collect render list
+    // 3. Render all collected renderables
+    // Should be 2-pass by hooking into the calculateLayout phase,
+    // but that's only possible if we move the layout tree to native.
+
+    // 1. Calculate layout from root
     if (this.layoutNode.yogaNode.isDirty()) {
       this.calculateLayout()
     }
-    const endLayout = performance.now()
 
     // 2. Update layout throughout the tree and collect render list
-    const startRender = performance.now()
     this.renderList.length = 0
     this.updateLayout(deltaTime, this.renderList)
-    const endRender = performance.now()
 
     // 3. Render all collected renderables
-    const startRenderList = performance.now()
     for (let i = 1; i < this.renderList.length; i++) {
       const command = this.renderList[i]
       switch (command.action) {
@@ -1447,16 +1459,6 @@ export class RootRenderable extends Renderable {
           break
       }
     }
-    const endRenderList = performance.now()
-
-    console.log(
-      "Layout:",
-      endLayout - startLayout,
-      "Render:",
-      endRender - startRender,
-      "RenderList:",
-      endRenderList - startRenderList,
-    )
   }
 
   protected propagateLiveCount(delta: number): void {
