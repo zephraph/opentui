@@ -572,7 +572,7 @@ export abstract class Renderable extends BaseRenderable {
     padding: number = 10,
     minTriggerSize: number = 16,
   ): Renderable[] {
-    // if (this.renderableArray.length < minTriggerSize) return this.renderableArray
+    if (this.renderableArray.length < minTriggerSize) return this.renderableArray
 
     const viewportTop = viewport.y - padding
     const viewportBottom = viewport.y + viewport.height + padding
@@ -598,8 +598,6 @@ export abstract class Renderable extends BaseRenderable {
       const c = children[mid]
       const start = isRow ? c.x : c.y
       const end = isRow ? c.x + c.width : c.y + c.height
-
-      // console.log(`Child ${mid}:`, { x: c.x, y: c.y, width: c.width, height: c.height, start, end })
 
       if (end < vpStart) {
         lo = mid + 1 // before viewport along axis
@@ -1109,8 +1107,6 @@ export abstract class Renderable extends BaseRenderable {
       return -1
     }
 
-    console.log("add", renderable.id, index)
-
     if (renderable.isDestroyed) {
       if (process.env.NODE_ENV !== "production") {
         console.warn(`Renderable with id ${renderable.id} was already destroyed, skipping add`)
@@ -1189,7 +1185,7 @@ export abstract class Renderable extends BaseRenderable {
     if (!id) {
       return
     }
-    console.log("remove", id)
+
     if (this.renderableMap.has(id)) {
       const obj = this.renderableMap.get(id)
       if (obj) {
