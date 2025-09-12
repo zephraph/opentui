@@ -268,7 +268,6 @@ export abstract class Renderable extends BaseRenderable {
   protected _position: Position = {}
 
   private renderableMap: Map<string, Renderable> = new Map()
-  protected renderableArray: Renderable[] = []
   private needsZIndexSort: boolean = false
   public parent: Renderable | null = null
 
@@ -436,10 +435,13 @@ export abstract class Renderable extends BaseRenderable {
   public handleKeyPress?(key: ParsedKey | string): boolean
 
   public findDescendantById(id: string): Renderable | undefined {
-    for (const child of this.renderableArray) {
-      if (child.id === id) return child
-      const found = child.findDescendantById(id)
+    let current = this.layoutNode.firstChild
+    while (current) {
+      const childRenderable = current.metadata.renderable as Renderable
+      if (childRenderable.id === id) return childRenderable
+      const found = childRenderable.findDescendantById(id)
       if (found) return found
+      current = current.nextSibling
     }
     return undefined
   }
@@ -574,20 +576,39 @@ export abstract class Renderable extends BaseRenderable {
 
   private ensureZIndexSorted(): void {
     if (this.needsZIndexSort) {
-      this.renderableArray.sort((a, b) => (a.zIndex > b.zIndex ? 1 : a.zIndex < b.zIndex ? -1 : 0))
+      // Get all children as array and sort by zIndex
+      const children = this.getChildren()
+      children.sort((a, b) => (a.zIndex > b.zIndex ? 1 : a.zIndex < b.zIndex ? -1 : 0))
+
+      // Rebuild the linked list in sorted order
+      // First, unlink all children from layout
+      let current = this.layoutNode.firstChild
+      while (current) {
+        const next = current.nextSibling
+        this.layoutNode.removeChild(current)
+        current = next
+      }
+
+      // Re-add children in sorted order
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i]
+        this.layoutNode.addChild(child.layoutNode)
+      }
+
       this.needsZIndexSort = false
     }
   }
 
   public getChildrenSortedByPrimaryAxis(): Renderable[] {
-    if (!this.childrenPrimarySortDirty && this.childrenSortedByPrimaryAxis.length === this.renderableArray.length) {
+    const children = this.getChildren()
+    if (!this.childrenPrimarySortDirty && this.childrenSortedByPrimaryAxis.length === children.length) {
       return this.childrenSortedByPrimaryAxis
     }
 
     const dir = this.layoutNode.yogaNode.getFlexDirection()
     const axis: "x" | "y" = dir === 2 || dir === 3 ? "x" : "y"
 
-    const sorted = [...this.renderableArray]
+    const sorted = [...children]
     sorted.sort((a, b) => {
       const va = axis === "y" ? a.y : a.x
       const vb = axis === "y" ? b.y : b.x
@@ -1048,11 +1069,11 @@ export abstract class Renderable extends BaseRenderable {
     const childLayoutNode = renderable.getLayoutNode()
     let insertedIndex: number
     if (index !== undefined) {
-      this.renderableArray.splice(index, 0, renderable)
-      this._forceLayoutUpdateFor = this.renderableArray.slice(index)
       insertedIndex = this.layoutNode.insertChild(childLayoutNode, index)
+      // Track children that need layout updates after insertion
+      const childrenFromIndex = this.getChildrenFromIndex(index)
+      this._forceLayoutUpdateFor = childrenFromIndex
     } else {
-      this.renderableArray.push(renderable)
       insertedIndex = this.layoutNode.addChild(childLayoutNode)
     }
     this.needsZIndexSort = true
@@ -1067,6 +1088,17 @@ export abstract class Renderable extends BaseRenderable {
     this.requestRender()
 
     return insertedIndex
+  }
+
+  private getChildrenFromIndex(index: number): Renderable[] {
+    const result: Renderable[] = []
+    let current = this.layoutNode.getChildAtIndex(index)
+    while (current) {
+      const renderable = current.metadata.renderable as Renderable
+      result.push(renderable)
+      current = current.nextSibling
+    }
+    return result
   }
 
   insertBefore(obj: Renderable | VNode<any, any[]> | unknown, anchor?: Renderable | unknown): number {
@@ -1092,13 +1124,35 @@ export abstract class Renderable extends BaseRenderable {
       throw new Error("Anchor does not exist")
     }
 
-    const anchorIndex = this.renderableArray.indexOf(anchor)
-    // Same here: maybe just log a warning in dev.
-    if (anchorIndex === -1) {
-      throw new Error("Anchor does not exist")
+    if (renderable.isDestroyed) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(`Renderable with id ${renderable.id} was already destroyed, skipping insertBefore`)
+      }
+      return -1
     }
 
-    return this.add(renderable, anchorIndex)
+    if (this.renderableMap.has(renderable.id)) {
+      console.warn(`A renderable with id ${renderable.id} already exists in ${this.id}, removing it`)
+      this.remove(renderable.id)
+    }
+
+    this.replaceParent(renderable)
+
+    // Use TrackedNode's insertBefore method directly
+    const insertedIndex = this.layoutNode.insertBefore(renderable.getLayoutNode(), anchor.getLayoutNode())
+
+    this.needsZIndexSort = true
+    this.childrenPrimarySortDirty = true
+    this.renderableMap.set(renderable.id, renderable)
+    this._newChildren.push(renderable)
+
+    if (renderable._liveCount > 0) {
+      this.propagateLiveCount(renderable._liveCount)
+    }
+
+    this.requestRender()
+
+    return insertedIndex
   }
 
   // TODO: that naming is meh
@@ -1126,11 +1180,6 @@ export abstract class Renderable extends BaseRenderable {
         obj.parent = null
       }
       this.renderableMap.delete(id)
-
-      const index = this.renderableArray.findIndex((obj) => obj.id === id)
-      if (index !== -1) {
-        this.renderableArray.splice(index, 1)
-      }
       this.childrenPrimarySortDirty = true
     }
   }
@@ -1141,11 +1190,18 @@ export abstract class Renderable extends BaseRenderable {
   }
 
   public getChildren(): Renderable[] {
-    return [...this.renderableArray]
+    const result: Renderable[] = []
+    let current = this.layoutNode.firstChild
+    while (current) {
+      const renderable = current.metadata.renderable as Renderable
+      result.push(renderable)
+      current = current.nextSibling
+    }
+    return result
   }
 
   public getChildrenCount(): number {
-    return this.renderableArray.length
+    return this.layoutNode.getChildCount()
   }
 
   public updateLayout(deltaTime: number, renderList: RenderCommand[] = []): void {
@@ -1231,7 +1287,7 @@ export abstract class Renderable extends BaseRenderable {
   }
 
   protected _getChildren(): Renderable[] {
-    return this.renderableArray
+    return this.getChildren()
   }
 
   protected onUpdate(deltaTime: number): void {
@@ -1273,11 +1329,11 @@ export abstract class Renderable extends BaseRenderable {
       this.frameBuffer = null
     }
 
-    for (const child of this.renderableArray) {
+    const children = this.getChildren()
+    for (const child of children) {
       this.remove(child.id)
     }
 
-    this.renderableArray = []
     this.renderableMap.clear()
     Renderable.renderablesByNumber.delete(this.num)
 
@@ -1289,8 +1345,9 @@ export abstract class Renderable extends BaseRenderable {
   }
 
   public destroyRecursively(): void {
-    // Destroy children first to ensure removal as destroy clears child array
-    for (const child of this.renderableArray) {
+    // Destroy children first to ensure removal as destroy clears child list
+    const children = this.getChildren()
+    for (const child of children) {
       child.destroyRecursively()
     }
     this.destroy()
