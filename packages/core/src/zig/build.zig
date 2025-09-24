@@ -25,6 +25,17 @@ fn applyZgDependencies(b: *std.Build, module: *std.Build.Module, optimize: std.b
     module.addImport("DisplayWidth", zg_dep.module("DisplayWidth"));
 }
 
+/// Apply ghostty-vt dependencies to a module (lazy dependency for testing)
+fn applyGhosttyVtDependencies(b: *std.Build, module: *std.Build.Module, optimize: std.builtin.OptimizeMode, target: std.Build.ResolvedTarget) void {
+    const ghostty_vt_dep = b.lazyDependency("ghostty-vt", .{
+        .optimize = optimize,
+        .target = target,
+    });
+    if (ghostty_vt_dep) |dep| {
+        module.addImport("ghostty-vt", dep.module("ghostty-vt"));
+    }
+}
+
 const SupportedTarget = struct {
     cpu_arch: std.Target.Cpu.Arch,
     os_tag: std.Target.Os.Tag,
@@ -106,6 +117,7 @@ pub fn build(b: *std.Build) void {
     });
 
     applyZgDependencies(b, test_exe.root_module, .Debug, test_target);
+    applyGhosttyVtDependencies(b, test_exe.root_module, .Debug, test_target);
 
     const run_test = b.addRunArtifact(test_exe);
     test_step.dependOn(&run_test.step);
@@ -148,6 +160,7 @@ fn buildTargetFromQuery(
     });
 
     applyZgDependencies(b, module, optimize, target);
+    applyGhosttyVtDependencies(b, module, optimize, target);
 
     target_output = b.addLibrary(.{
         .name = LIB_NAME,

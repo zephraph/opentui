@@ -8,6 +8,11 @@
             .url = "https://codeberg.org/atman/zg/archive/v0.14.1.tar.gz",
             .hash = "zg-0.14.1-oGqU3IQ_tALZIiBN026_NTaPJqU-Upm8P_C7QED2Rzm8",
         },
+        .@"ghostty-vt" = .{
+            .url = "https://github.com/ghostty-org/ghostty/archive/f97518c.tar.gz",
+            .hash = "ghostty-1.2.1-5UdBC1oNUgOK2FWE75IMEivYl7gGkQjAXA4y44OUjK39",
+            .lazy = true,
+        },
     },
     .paths = .{
         "build.zig",

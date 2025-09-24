@@ -20,6 +20,10 @@ export async function createTestRenderer(options: TestRendererOptions): Promise<
   renderOnce: () => Promise<void>
   captureCharFrame: () => string
   resize: (width: number, height: number) => void
+  vtWrite: (data: string) => void
+  vtGetScreenContent: () => string
+  vtGetCursorPosition: () => { x: number; y: number }
+  vtResize: (width: number, height: number) => void
 }> {
   process.env.OTUI_USE_CONSOLE = "false"
   const renderer = await setupTestRenderer({
@@ -51,6 +55,18 @@ export async function createTestRenderer(options: TestRendererOptions): Promise<
     resize: (width: number, height: number) => {
       //@ts-expect-error - this is a test renderer
       renderer.processResize(width, height)
+    },
+    vtWrite: (data: string) => {
+      renderer.zigLib.vtWrite(renderer.rendererPtr, data)
+    },
+    vtGetScreenContent: () => {
+      return renderer.zigLib.vtGetScreenContent(renderer.rendererPtr)
+    },
+    vtGetCursorPosition: () => {
+      return renderer.zigLib.vtGetCursorPosition(renderer.rendererPtr)
+    },
+    vtResize: (width: number, height: number) => {
+      renderer.zigLib.vtResize(renderer.rendererPtr, width, height)
     },
   }
 }

@@ -393,6 +393,24 @@ function getOpenTUILib(libPath?: string) {
       args: ["ptr", "ptr", "usize"],
       returns: "void",
     },
+
+    // Virtual terminal testing functions
+    vtWrite: {
+      args: ["ptr", "ptr", "usize"],
+      returns: "void",
+    },
+    vtGetScreenContent: {
+      args: ["ptr", "ptr", "usize"],
+      returns: "usize",
+    },
+    vtGetCursorPosition: {
+      args: ["ptr", "ptr", "ptr"],
+      returns: "void",
+    },
+    vtResize: {
+      args: ["ptr", "u32", "u32"],
+      returns: "void",
+    },
   })
 
   if (env.OTUI_DEBUG_FFI || env.OTUI_TRACE_FFI) {
@@ -775,6 +793,12 @@ export interface RenderLib {
 
   getTerminalCapabilities: (renderer: Pointer) => any
   processCapabilityResponse: (renderer: Pointer, response: string) => void
+
+  // Virtual terminal testing functions
+  vtWrite: (renderer: Pointer, data: string) => void
+  vtGetScreenContent: (renderer: Pointer, maxLength?: number) => string
+  vtGetCursorPosition: (renderer: Pointer) => { x: number; y: number }
+  vtResize: (renderer: Pointer, width: number, height: number) => void
 }
 
 class FFIRenderLib implements RenderLib {
@@ -1541,6 +1565,29 @@ class FFIRenderLib implements RenderLib {
   public processCapabilityResponse(renderer: Pointer, response: string): void {
     const responseBytes = this.encoder.encode(response)
     this.opentui.symbols.processCapabilityResponse(renderer, responseBytes, responseBytes.length)
+  }
+
+  public vtWrite(renderer: Pointer, data: string): void {
+    const dataBytes = this.encoder.encode(data)
+    this.opentui.symbols.vtWrite(renderer, dataBytes, dataBytes.length)
+  }
+
+  public vtGetScreenContent(renderer: Pointer, maxLength: number = 8192): string {
+    const buffer = new Uint8Array(maxLength)
+    const actualLength = this.opentui.symbols.vtGetScreenContent(renderer, buffer, maxLength)
+    const length = typeof actualLength === "bigint" ? Number(actualLength) : actualLength
+    return this.decoder.decode(buffer.slice(0, length))
+  }
+
+  public vtGetCursorPosition(renderer: Pointer): { x: number; y: number } {
+    const xBuffer = new Uint32Array(1)
+    const yBuffer = new Uint32Array(1)
+    this.opentui.symbols.vtGetCursorPosition(renderer, xBuffer, yBuffer)
+    return { x: xBuffer[0], y: yBuffer[0] }
+  }
+
+  public vtResize(renderer: Pointer, width: number, height: number): void {
+    this.opentui.symbols.vtResize(renderer, width, height)
   }
 }
 

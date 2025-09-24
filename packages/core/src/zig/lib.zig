@@ -526,3 +526,36 @@ export fn textBufferSetWrapMode(tb: *text_buffer.TextBuffer, mode: u8) void {
     };
     tb.setWrapMode(wrapMode);
 }
+
+// Virtual terminal testing functions
+export fn vtWrite(rendererPtr: *renderer.CliRenderer, dataPtr: [*]const u8, dataLen: usize) void {
+    if (rendererPtr.virtual_terminal) |vt| {
+        const data = dataPtr[0..dataLen];
+        renderer.vtWrite(vt, data) catch {};
+    }
+}
+
+export fn vtGetScreenContent(rendererPtr: *renderer.CliRenderer, outputPtr: [*]u8, maxLen: usize) usize {
+    if (rendererPtr.virtual_terminal) |vt| {
+        const output = outputPtr[0..maxLen];
+        return renderer.vtGetScreenContent(vt, output) catch 0;
+    }
+    return 0;
+}
+
+export fn vtGetCursorPosition(rendererPtr: *renderer.CliRenderer, xPtr: *u32, yPtr: *u32) void {
+    if (rendererPtr.virtual_terminal) |vt| {
+        const pos = renderer.vtGetCursorPosition(vt);
+        xPtr.* = pos.x;
+        yPtr.* = pos.y;
+    } else {
+        xPtr.* = 0;
+        yPtr.* = 0;
+    }
+}
+
+export fn vtResize(rendererPtr: *renderer.CliRenderer, width: u32, height: u32) void {
+    if (rendererPtr.virtual_terminal) |vt| {
+        renderer.vtResize(vt, width, height) catch {};
+    }
+}
