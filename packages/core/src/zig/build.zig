@@ -165,7 +165,7 @@ fn buildTargetFromQuery(
     target_output = b.addLibrary(.{
         .name = LIB_NAME,
         .root_module = module,
-        .linkage = .dynamic,
+        .linkage = .static,
     });
 
     const target_name = try createTargetName(b.allocator, target.result);
