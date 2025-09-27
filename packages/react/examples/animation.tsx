@@ -1,6 +1,6 @@
 import { TextAttributes } from "@opentui/core"
 import { render, useTimeline } from "@opentui/react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 type Stats = {
   cpu: number
@@ -22,21 +22,23 @@ export const App = () => {
     loop: false,
   })
 
-  timeline.add(
-    stats,
-    {
-      cpu: 85,
-      memory: 70,
-      network: 95,
-      disk: 60,
-      duration: 3000,
-      ease: "linear",
-      onUpdate: (values) => {
-        setAnimatedStats({ ...values.targets[0] })
+  useEffect(() => {
+    timeline.add(
+      stats,
+      {
+        cpu: 85,
+        memory: 70,
+        network: 95,
+        disk: 60,
+        duration: 3000,
+        ease: "linear",
+        onUpdate: (values) => {
+          setAnimatedStats({ ...values.targets[0] })
+        },
       },
-    },
-    0,
-  )
+      0,
+    )
+  }, [])
 
   const statsMap = [
     { name: "CPU", key: "cpu", color: "#6a5acd" },
