@@ -556,6 +556,6 @@ export fn vtGetCursorPosition(rendererPtr: *renderer.CliRenderer, xPtr: *u32, yP
 
 export fn vtResize(rendererPtr: *renderer.CliRenderer, width: u32, height: u32) void {
     if (rendererPtr.virtual_terminal) |vt| {
-        renderer.vtResize(vt, width, height) catch {};
+        renderer.vtResize(vt, width, height, rendererPtr.allocator) catch {};
     }
 }

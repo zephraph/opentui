@@ -5,11 +5,7 @@ const buf = @import("buffer.zig");
 const gp = @import("grapheme.zig");
 const Terminal = @import("terminal.zig");
 const logger = @import("logger.zig");
-
-// Import ghostty-vt for testing
-const ghostty_vt = if (@hasDecl(@import("root"), "ghostty-vt")) @import("ghostty-vt") else struct {
-    pub const VT = opaque {};
-};
+const ghostty_vt = @import("ghostty-vt");
 
 pub const RGBA = ansi.RGBA;
 pub const OptimizedBuffer = buf.OptimizedBuffer;
@@ -111,7 +107,7 @@ pub const CliRenderer = struct {
     mouseMovementEnabled: bool,
 
     // Virtual terminal for testing (only available when testing = true)
-    virtual_terminal: ?*ghostty_vt.VT,
+    virtual_terminal: ?*ghostty_vt.Terminal,
     // Preallocated output buffer
     var outputBuffer: [OUTPUT_BUFFER_SIZE]u8 = undefined;
     var outputBufferLen: usize = 0;
@@ -227,14 +223,14 @@ pub const CliRenderer = struct {
             .mouseEnabled = false,
             .mouseMovementEnabled = false,
             .virtual_terminal = if (testing and @hasDecl(@import("root"), "ghostty-vt")) blk: {
-                const vt = ghostty_vt.VT.init(allocator, .{
+                var vt = ghostty_vt.Terminal.init(allocator, .{
                     .cols = @intCast(width),
                     .rows = @intCast(height),
                 }) catch {
                     logger.warn("Failed to initialize virtual terminal for testing", .{});
                     break :blk null;
                 };
-                break :blk vt;
+                break :blk &vt;
             } else null,
         };
 
@@ -278,8 +274,9 @@ pub const CliRenderer = struct {
 
         // Clean up virtual terminal if it exists
         if (self.virtual_terminal) |vt| {
-            vt.deinit();
+            vt.deinit(self.allocator);
         }
+
 
         self.allocator.destroy(self);
     }
@@ -1049,24 +1046,23 @@ pub const CliRenderer = struct {
 };
 
 // Virtual terminal helper functions for testing
-pub fn vtWrite(vt: *ghostty_vt.VT, data: []const u8) !void {
-    try vt.write(data);
+pub fn vtWrite(vt: *ghostty_vt.Terminal, data: []const u8) !void {
+    try vt.printString(data);
 }
 
-pub fn vtGetScreenContent(vt: *ghostty_vt.VT, output: []u8) !usize {
-    const screen = vt.getScreen();
-    const content = screen.getPlainText();
-    const copyLen = @min(content.len, output.len);
-    @memcpy(output[0..copyLen], content[0..copyLen]);
-    return copyLen;
+pub fn vtGetScreenContent(vt: *ghostty_vt.Terminal, output: []u8) !usize {
+    const screen = &vt.screen;
+    // Basic implementation - would need proper screen content extraction
+    _ = screen;
+    _ = output;
+    return 0; // TODO: Implement proper screen content extraction
 }
 
-pub fn vtGetCursorPosition(vt: *ghostty_vt.VT) struct { x: u32, y: u32 } {
-    const screen = vt.getScreen();
-    const cursor = screen.getCursor();
-    return .{ .x = cursor.x, .y = cursor.y };
+pub fn vtGetCursorPosition(vt: *ghostty_vt.Terminal) struct { x: u32, y: u32 } {
+    const screen = &vt.screen;
+    return .{ .x = @intCast(screen.cursor.x), .y = @intCast(screen.cursor.y) };
 }
 
-pub fn vtResize(vt: *ghostty_vt.VT, width: u32, height: u32) !void {
-    try vt.resize(width, height);
+pub fn vtResize(vt: *ghostty_vt.Terminal, width: u32, height: u32, allocator: std.mem.Allocator) !void {
+    try vt.resize(allocator, @intCast(width), @intCast(height));
 }
